@@ -1,0 +1,27 @@
+## Set common environment variables
+TOP ?= $(shell git rev-parse --show-toplevel)
+
+## Export the variables for environment substitutions in makefile
+export BP_COMMON_DIR    := $(TOP)/bp_common
+export BP_FE_DIR        := $(TOP)/bp_fe
+export BP_BE_DIR        := $(TOP)/bp_be
+export BP_ME_DIR        := $(TOP)/bp_me
+export BP_TOP_DIR       := $(TOP)/bp_top
+export BP_EXTERNAL_DIR  := $(TOP)/external
+export BASEJUMP_STL_DIR := $(BP_EXTERNAL_DIR)/basejump_stl
+export HARDFLOAT_DIR    := $(BP_EXTERNAL_DIR)/HardFloat
+
+## Directories to install into
+export BP_RTL_DIR         ?= $(TOP)
+export BP_RTL_INSTALL_DIR := $(BP_RTL_DIR)/install
+export BP_RTL_BIN_DIR     := $(BP_RTL_INSTALL_DIR)/bin
+export BP_RTL_LIB_DIR     := $(BP_RTL_INSTALL_DIR)/lib
+export BP_RTL_INCLUDE_DIR := $(BP_RTL_INSTALL_DIR)/include
+export BP_RTL_TOUCH_DIR   := $(BP_RTL_INSTALL_DIR)/touch
+
+export BP_TOOLS_DIR ?= $(TOP)/../tools
+include $(BP_TOOLS_DIR)/Makefile.common
+
+export BP_SDK_DIR ?= $(TOP)/../sdk
+include $(BP_SDK_DIR)/Makefile.common
+
