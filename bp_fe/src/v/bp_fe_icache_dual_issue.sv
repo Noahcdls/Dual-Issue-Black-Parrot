@@ -54,8 +54,8 @@ module bp_fe_icache
 
    // Cycle 0: "Decode"
    // New I$ packet comes in for a fetch, fence or fill request.
-   , input [icache_pkt_width_lp-1:0]                  icache_pkt_i1
-   ,                                                  icache_pkt_i2
+   , input [icache_pkt_width_lp-1:0]                  icache_pkt1_i
+   ,                                                  icache_pkt2_i
    //valid bit? and data ready maybe
    , input                                            v_i1
    ,                                                  v_i2
@@ -74,8 +74,8 @@ module bp_fe_icache
    ,                                                  ptag_nonidem_i2
    , input                                            ptag_dram_i1
    ,                                                  ptag_dram_i2
-   //dont know if 
-   , input                                            poison_tl_i
+   //dont know if I need to add another poison. Adding one anyways
+   , input                                            poison_tl_i1, poison_tl_i2
 
    // Cycle 2: "Tag Verify"
    // Data (or miss result) comes out of the cache
@@ -90,34 +90,35 @@ module bp_fe_icache
    // This is considered the "slow path", handling uncached requests
    //   and fill DMAs. It also handles coherence transactions for
    //   configurations which support that behavior
-   , output logic [icache_req_width_lp-1:0]           cache_req_o
-   , output logic                                     cache_req_v_o
-   , input                                            cache_req_yumi_i
-   , input                                            cache_req_busy_i
-   , output logic [icache_req_metadata_width_lp-1:0]  cache_req_metadata_o
-   , output logic                                     cache_req_metadata_v_o
-   , input                                            cache_req_critical_tag_i
-   , input                                            cache_req_critical_data_i
-   , input                                            cache_req_complete_i
-   , input                                            cache_req_credits_full_i
-   , input                                            cache_req_credits_empty_i
+   , output logic [icache_req_width_lp-1:0]           cache_req1_o, cache_req2_o
+   , output logic                                     cache_req1_v_o, cache_req2_v_o
+   , input                                            cache_req1_yumi_i,cache_req2_yumi_i
+   , input                                            cache_req1_busy_i,cache_req2_busy_i
+   , output logic [icache_req_metadata_width_lp-1:0]  cache_req1_metadata_o, cache_req2_metadata_o
+   , output logic                                     cache_req1_metadata_v_o, cache_req2_metadata_v_o
+   , input                                            cache_req1_critical_tag_i, cache_req2_critical_tag_i
+   , input                                            cache_req1_critical_data_i, cache_req2_critical_data_i
+   , input                                            cache_req1_complete_i, cache_req2_complete_i
+   , input                                            cache_req1_credits_full_i, cache_req2_credits_full_i
+   , input                                            cache_req1_credits_empty_i, cache_req2_credits_empty_i
 
-   , input                                            data_mem_pkt_v_i
-   , input [icache_data_mem_pkt_width_lp-1:0]         data_mem_pkt_i
-   , output logic                                     data_mem_pkt_yumi_o
-   , output logic [block_width_p-1:0]                 data_mem_o
+   , input                                            data_mem_pkt1_v_i, data_mem_pkt2_v_i
+   , input [icache_data_mem_pkt_width_lp-1:0]         data_mem_pkt1_i, data_mem_pkt2_i
+   , output logic                                     data_mem_pkt1_yumi_o, data_mem_pkt2_yumi_o
+   , output logic [block_width_p-1:0]                 data_mem1_o, data_mem2_o
 
-   , input                                            tag_mem_pkt_v_i
-   , input [icache_tag_mem_pkt_width_lp-1:0]          tag_mem_pkt_i
-   , output logic                                     tag_mem_pkt_yumi_o
-   , output logic [icache_tag_info_width_lp-1:0]      tag_mem_o
+   , input                                            tag_mem_pkt1_v_i, tag_mem_pkt2_v_i
+   , input [icache_tag_mem_pkt_width_lp-1:0]          tag_mem_pkt1_i, tag_mem_pkt2_i
+   , output logic                                     tag_mem_pkt1_yumi_o, tag_mem_pkt2_yumi_o
+   , output logic [icache_tag_info_width_lp-1:0]      tag_mem1_o, tag_mem2_o
 
-   , input                                            stat_mem_pkt_v_i
-   , input [icache_stat_mem_pkt_width_lp-1:0]         stat_mem_pkt_i
-   , output logic                                     stat_mem_pkt_yumi_o
-   , output logic [icache_stat_info_width_lp-1:0]     stat_mem_o
+   , input                                            stat_mem_pkt1_v_i, stat_mem_pkt2_v_i
+   , input [icache_stat_mem_pkt_width_lp-1:0]         stat_mem_pkt1_i, stat_mem_pkt2_i
+   , output logic                                     stat_mem_pkt1_yumi_o, stat_mem_pkt2_yumi_o
+   , output logic [icache_stat_info_width_lp-1:0]     stat_mem1_o, stat_mem2_o
    );
 
+  //declaring parameters for the system here
   `declare_bp_cache_engine_if(paddr_width_p, ctag_width_p, sets_p, assoc_p, dword_width_gp, block_width_p, fill_width_p, icache);
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
@@ -144,9 +145,10 @@ module bp_fe_icache
 
   // Feedback signals between stages
   // double feedback here
-  logic tl_we, tv_we;
-  logic v_tl_r, v_tv_r;
-
+  logic tl_we1, tv_we1;
+  logic tl_we2, tv_we;
+  logic v_tl_r1, v_tv_r1;
+  logic v_tl_r2, v_tv_r2;
   // Uncached storage
   //double this
   logic [dword_width_gp-1:0] uncached_data_r;
@@ -157,41 +159,70 @@ module bp_fe_icache
   /////////////////////////////////////////////////////////////////////////////
 
   //NOTE TO DOUBLE THE DECODE
+
+  //declares icache pkt size?
   `declare_bp_fe_icache_pkt_s(vaddr_width_p);
-  `bp_cast_i(bp_fe_icache_pkt_s, icache_pkt);
+  `bp_cast_i(bp_fe_icache_pkt_s, icache_pkt1);
+  `bp_cast_i(bp_fe_icache_pkt_s, icache_pkt2);
 
-  wire is_fetch  = (icache_pkt_cast_i.op inside {e_icache_fetch, e_icache_fill});
-  wire is_fencei = (icache_pkt_cast_i.op inside {e_icache_fencei});
-  wire is_fill   = (icache_pkt_cast_i.op inside {e_icache_fill});
+//pkt_cast variable is assigned to icache_pkt_i. This needs to be updated so it can ready correctly
+  wire is_fetch1  = (icache_pkt1_cast_i.op inside {e_icache_fetch, e_icache_fill});
+  wire is_fencei1 = (icache_pkt1_cast_i.op inside {e_icache_fencei});
+  wire is_fill1   = (icache_pkt1_cast_i.op inside {e_icache_fill});
+  wire is_fetch2  = (icache_pkt2_cast_i.op inside {e_icache_fetch, e_icache_fill});
+  wire is_fencei2 = (icache_pkt2_cast_i.op inside {e_icache_fencei});
+  wire is_fill2  = (icache_pkt2_cast_i.op inside {e_icache_fill});
 
-  wire [vaddr_width_p-1:0]   vaddr       = icache_pkt_cast_i.vaddr;
-  wire [vtag_width_p-1:0]    vaddr_vtag  = vaddr[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
-  wire [sindex_width_lp-1:0] vaddr_index = vaddr[block_offset_width_lp+:sindex_width_lp];
-  wire [bindex_width_lp-1:0] vaddr_bank  = vaddr[byte_offset_width_lp+:bindex_width_lp];
+
+//virtual address values
+  wire [vaddr_width_p-1:0]   vaddr1      = icache_pkt1_cast_i.vaddr;
+  wire [vtag_width_p-1:0]    vaddr_vtag1  = vaddr1[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
+  wire [sindex_width_lp-1:0] vaddr_index1 = vaddr1[block_offset_width_lp+:sindex_width_lp];
+  wire [bindex_width_lp-1:0] vaddr_bank1  = vaddr1[byte_offset_width_lp+:bindex_width_lp];
+
+  wire [vaddr_width_p-1:0]   vaddr2       = icache_pkt2_cast_i.vaddr;
+  wire [vtag_width_p-1:0]    vaddr_vtag2  = vaddr2[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
+  wire [sindex_width_lp-1:0] vaddr_index2 = vaddr2[block_offset_width_lp+:sindex_width_lp];
+  wire [bindex_width_lp-1:0] vaddr_bank2  = vaddr2[byte_offset_width_lp+:bindex_width_lp];
 
   ///////////////////////////
   // Tag Mem Storage
   ///////////////////////////
-  `bp_cast_i(bp_icache_tag_mem_pkt_s, tag_mem_pkt);
+  `bp_cast_i(bp_icache_tag_mem_pkt_s, tag_mem_pkt1);
+  logic                              tag_mem_v_li1;
+  logic                              tag_mem_w_li1;
+  logic [sindex_width_lp-1:0]        tag_mem_addr_li1;
+  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_w_mask_li1;
+  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_data_li1;
+  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_data_lo1;
+
+  `bp_cast_i(bp_icache_tag_mem_pkt_s, tag_mem_pkt2);
   logic                              tag_mem_v_li;
-  logic                              tag_mem_w_li;
-  logic [sindex_width_lp-1:0]        tag_mem_addr_li;
-  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_w_mask_li;
-  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_data_li;
-  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_data_lo;
+  logic                              tag_mem_w_li2;
+  logic [sindex_width_lp-1:0]        tag_mem_addr_li2;
+  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_w_mask_li2;
+  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_data_li2;
+  bp_icache_tag_info_s [assoc_p-1:0] tag_mem_data_lo2;
 
 //update tag memory
-  bsg_mem_1rw_sync_mask_write_bit
-   #(.width_p(assoc_p*($bits(bp_icache_tag_info_s))), .els_p(sets_p), .latch_last_read_p(1))
+  bsg_mem_2rw_sync_mask_write_bit
+   #(.width_p(assoc_p*($bits(bp_icache_tag_info_s))), .els_p(sets_p), .read_write_same_addr_p(0))
    tag_mem
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
-     ,.data_i(tag_mem_data_li)
-     ,.addr_i(tag_mem_addr_li)
-     ,.v_i(tag_mem_v_li)
-     ,.w_mask_i(tag_mem_w_mask_li)
-     ,.w_i(tag_mem_w_li)
-     ,.data_o(tag_mem_data_lo)
+     ,.a_data_i(tag_mem_data_li1)
+     ,.a_addr_i(tag_mem_addr_li1)
+     ,.a_v_i(tag_mem_v_li1)
+     ,.a_w_mask_i(tag_mem_w_mask_li1)
+     ,.a_w_i(tag_mem_w_li1)
+     ,.a_data_o(tag_mem_data_lo1)
+
+     ,.b_data_i(tag_mem_data_li2)
+     ,.b_addr_i(tag_mem_addr_li2)
+     ,.b_v_i(tag_mem_v_li2)
+     ,.b_w_mask_i(tag_mem_w_mask_li2)
+     ,.b_w_i(tag_mem_w_li2)
+     ,.b_data_o(tag_mem_data_lo2)
      );
 
   ///////////////////////////
@@ -209,15 +240,21 @@ module bp_fe_icache
 //change to dual issue
   for (genvar bank = 0; bank < assoc_p; bank++)
     begin: data_mems
-      bsg_mem_1rw_sync #(.width_p(bank_width_lp), .els_p(sets_p*assoc_p), .latch_last_read_p(1))
+      bsg_mem_2rw_sync #(.width_p(bank_width_lp), .els_p(sets_p*assoc_p))
        data_mem
         (.clk_i(clk_i)
          ,.reset_i(reset_i)
-         ,.data_i(data_mem_data_li[bank])
-         ,.addr_i(data_mem_addr_li[bank])
-         ,.v_i(data_mem_v_li[bank])
-         ,.w_i(data_mem_w_li[bank])
-         ,.data_o(data_mem_data_lo[bank])
+         ,.a_data_i(data_mem_data_li1[bank])
+         ,.a_addr_i(data_mem_addr_li1[bank])
+         ,.a_v_i(data_mem_v_li1[bank])
+         ,.a_w_i(data_mem_w_li1[bank])
+         ,.a_data_o(data_mem_data_lo1[bank])
+
+         ,.b_data_i(data_mem_data_li2[bank])
+         ,.b_addr_i(data_mem_addr_li2[bank])
+         ,.b_v_i(data_mem_v_li2[bank])
+         ,.b_w_i(data_mem_w_li2[bank])
+         ,.b_data_o(data_mem_data_lo2[bank])
          );
     end
 
@@ -231,26 +268,50 @@ module bp_fe_icache
   assign tl_we = ready_o & v_i;
   bsg_dff_reset_set_clear
    #(.width_p(1))
-   v_tl_reg
+   v_tl_reg1
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.set_i(tl_we & ~cache_req_yumi_i)
+     ,.set_i(tl_we1 & ~cache_req_yumi_i)
      // We always advance in the non-stalling I$
      ,.clear_i(1'b1)
-     ,.data_o(v_tl_r)
+     ,.data_o(v_tl_r1)
      );
 
+  bsg_dff_reset_set_clear
+   #(.width_p(1))
+   v_tl_reg2
+    (.clk_i(clk_i)
+     ,.reset_i(reset_i)
+
+     ,.set_i(tl_we2 & ~cache_req_yumi_i)
+     // We always advance in the non-stalling I$
+     ,.clear_i(1'b1)
+     ,.data_o(v_tl_r2)
+     );   
+
+
+//update logic to account for duplicate wires
   // Save stage information
   bsg_dff_reset_en
    #(.width_p(vaddr_width_p+3))
    tl_stage_reg
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
-     ,.en_i(tl_we)
-     ,.data_i({vaddr, is_fill, is_fetch, is_fencei})
-     ,.data_o({vaddr_tl_r, fill_op_tl_r, fetch_op_tl_r, fencei_op_tl_r})
+     ,.en_i(tl_we1)
+     ,.data_i({vaddr1, is_fill1, is_fetch1, is_fencei1})
+     ,.data_o({vaddr_tl_r1, fill_op_tl_r1, fetch_op_tl_r1, fencei_op_tl_r1})
      );
+
+  bsg_dff_reset_en
+   #(.width_p(vaddr_width_p+3))
+   tl_stage_reg2
+    (.clk_i(clk_i)
+     ,.reset_i(reset_i)
+     ,.en_i(tl_we2)
+     ,.data_i({vaddr2, is_fill2, is_fetch2, is_fencei2})
+     ,.data_o({vaddr_tl_r2, fill_op_tl_r2, fetch_op_tl_r2, fencei_op_tl_r2})
+     );     
 
   wire [paddr_width_p-1:0]         paddr_tl = {ptag_i, vaddr_tl_r[0+:page_offset_width_gp]};
   wire [vtag_width_p-1:0]     vaddr_vtag_tl = vaddr_tl_r[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
@@ -386,24 +447,41 @@ module bp_fe_icache
   // Stat Mem Storage
   ///////////////////////////
   `bp_cast_i(bp_icache_stat_mem_pkt_s, stat_mem_pkt);
-  logic                       stat_mem_v_li;
-  logic                       stat_mem_w_li;
-  logic [sindex_width_lp-1:0] stat_mem_addr_li;
-  bp_icache_stat_info_s       stat_mem_data_li;
-  bp_icache_stat_info_s       stat_mem_mask_li;
-  bp_icache_stat_info_s       stat_mem_data_lo;
+  logic                       stat_mem_v_li1;
+  logic                       stat_mem_w_li1;
+  logic [sindex_width_lp-1:0] stat_mem_addr_li1;
+  bp_icache_stat_info_s       stat_mem_data_li1;
+  bp_icache_stat_info_s       stat_mem_mask_li1;
+  bp_icache_stat_info_s       stat_mem_data_lo1;
 
-  bsg_mem_1rw_sync_mask_write_bit
+  logic                       stat_mem_v_li2;
+  logic                       stat_mem_w_li2;
+  logic [sindex_width_lp-1:0] stat_mem_addr_li2;
+  bp_icache_stat_info_s       stat_mem_data_li2;
+  bp_icache_stat_info_s       stat_mem_mask_li2;
+  bp_icache_stat_info_s       stat_mem_data_lo2;
+
+
+
+// add wiring to support correct inputs
+  bsg_mem_2rw_sync_mask_write_bit
    #(.width_p(assoc_p-1), .els_p(sets_p), .latch_last_read_p(1))
    stat_mem
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
-     ,.data_i(stat_mem_data_li.lru)
-     ,.addr_i(stat_mem_addr_li)
-     ,.v_i(stat_mem_v_li)
-     ,.w_mask_i(stat_mem_mask_li.lru)
-     ,.w_i(stat_mem_w_li)
-     ,.data_o(stat_mem_data_lo.lru)
+     ,.a_data_i(stat_mem_data_li1.lru)
+     ,.a_addr_i(stat_mem_addr_li1)
+     ,.a_v_i(stat_mem_v_li1)
+     ,.a_w_mask_i(stat_mem_mask_li1.lru)
+     ,.a_w_i(stat_mem_w_li1)
+     ,.a_data_o(stat_mem_data_lo1.lru)
+
+     ,.b_data_i(stat_mem_data_li2.lru)
+     ,.b_addr_i(stat_mem_addr_li2)
+     ,.b_v_i(stat_mem_v_li2)
+     ,.b_w_mask_i(stat_mem_mask_li2.lru)
+     ,.b_w_i(stat_mem_w_li2)
+     ,.b_data_o(stat_mem_data_lo2.lru)
      );
   assign stat_mem_data_lo.dirty = '0;
 
