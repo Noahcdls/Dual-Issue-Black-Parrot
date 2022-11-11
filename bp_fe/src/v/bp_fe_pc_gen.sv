@@ -45,7 +45,7 @@ module bp_fe_pc_gen
 //branch metadata for the fetched instruction
    , output logic [branch_metadata_fwd_width_p-1:0]  fetch_br_metadata_fwd_o
 //fetch pc out
-   , output logic [vaddr_width_p-1:0]                fetch_pc_o
+   , output logic [vaddr_width_p-1:0]                fetch_pc_o1, fetch_pc_o2
 //attaboy if is a branch was correctly taken
 //contains address for next instruction after branch
 
@@ -385,7 +385,10 @@ logic passed_call1, passed_call2, pass_jump_path;
   assign ovr_taken  = btb_miss_br & ((is_br1 & pred_if2_r1.pred) | is_jal1 | (is_br2 & pred_if2_r2.pred) | is_jal2);
   assign ovr_o      = ovr_taken | ovr_ret;
   assign br_tgt_lo  = scan_instr1.branch ? pc_if2_r1 + scan_instr1.imm : pc_if2_r2 + scan_instr2.imm;
-  assign fetch_pc_o = pc_if2_r1;
+
+  //NEED TO DOUBLE SINCE WE ARE FETCHING TWO DECODED INSTR
+  assign fetch_pc_o1 = pc_if2_r1;
+  assign fetch_pc_o2 = pc_if2_r2;
 
   bp_fe_branch_metadata_fwd_s br_metadata_site;
   assign fetch_br_metadata_fwd_o = br_metadata_site;
