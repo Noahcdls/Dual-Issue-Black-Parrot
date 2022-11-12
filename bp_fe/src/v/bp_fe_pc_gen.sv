@@ -23,6 +23,7 @@ module bp_fe_pc_gen
 
    , output logic                                    init_done_o
 //branch redirection given bad prediction
+//redirect comes from resume PC
    , input                                           redirect_v_i
    , input [vaddr_width_p-1:0]                       redirect_pc_i
    , input                                           redirect_br_v_i

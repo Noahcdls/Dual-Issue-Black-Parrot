@@ -112,22 +112,31 @@ module bp_fe_top
   logic pc_gen_init_done_lo;
 //redirect pc to diff address. For pc gen
 //only need one redirect since we can only redirect with one address
+//assigned to the resume PC
   logic redirect_v_li;
   logic [vaddr_width_p-1:0] redirect_pc_li;
+  //saved state data saved in resume reg but originates from CMD
   logic redirect_br_v_li, redirect_br_taken_li, redirect_br_ntaken_li, redirect_br_nonbr_li;
+
   //metadata for miss and hit (redirect and attaboy)
+  //CMD metadata
   bp_fe_branch_metadata_fwd_s redirect_br_metadata_fwd_li;
   bp_fe_branch_metadata_fwd_s attaboy_br_metadata_fwd_li;
   logic attaboy_v_li, attaboy_yumi_lo, attaboy_taken_li, attaboy_ntaken_li;
+  //vaddr for correct prediction
   logic [vaddr_width_p-1:0] attaboy_pc_li;
   //get next instr for queue
   //need to duplicate the fetch logic since we fetched 2 instr
+  //li is instr, pc_lo is the pc value associated with the instr
   logic [instr_width_gp-1:0] fetch_li1, fetch_li2;
   logic [vaddr_width_p-1:0] fetch_pc_lo1, fetch_pc_lo2;
+  //valid instructions as well as exceptions for either
   logic fetch_instr_v_li1, fetch_instr_v_li2, fetch_exception_v_li1, fetch_exception_v_li2, fetch_fail_v_li;
+  //branch metadata provided by pc_gen
   bp_fe_branch_metadata_fwd_s fetch_br_metadata_fwd_lo;
   //next pc to feed to icache in next cycle
   logic [vaddr_width_p-1:0] next_pc_lo1, next_pc_lo2;
+  //yumi/can run if the system is running and not stalled
   logic next_pc_yumi_li;
   logic ovr_lo;
 
@@ -140,7 +149,7 @@ module bp_fe_top
 
      ,.init_done_o(pc_gen_init_done_lo)
 
-     ,.redirect_v_i(redirect_v_li)
+     ,.redirect_v_i(redirect_v_li) //resume valid and pc and metadata
      ,.redirect_pc_i(redirect_pc_li)
      ,.redirect_br_v_i(redirect_br_v_li)
      ,.redirect_br_metadata_fwd_i(redirect_br_metadata_fwd_li)
@@ -148,22 +157,22 @@ module bp_fe_top
      ,.redirect_br_ntaken_i(redirect_br_ntaken_li)
      ,.redirect_br_nonbr_i(redirect_br_nonbr_li)
 
-     ,.next_pc_o1(next_pc_lo1)
+     ,.next_pc_o1(next_pc_lo1) //next pc data provided by pc_gen
      ..next_pc_o2(next_pc_lo2)
-     ,.next_pc_yumi_i(next_pc_yumi_li)
+     ,.next_pc_yumi_i(next_pc_yumi_li) //input on whether the next instr can run
 
-     ,.ovr_o(ovr_lo)
+     ,.ovr_o(ovr_lo)//output if BTB misses but still need to branch
 
-     ,.fetch_i1(fetch_li1)
+     ,.fetch_i1(fetch_li1)//instructions fetched. Used to provide prediction
      ,.fetch_i2(fetch_li2)
      ,.fetch_instr_v_i1(fetch_instr_v_li1)
      ,.fetch_instr_v_i2(fetch_instr_v_li2)
      ,.fetch_exception_v_i1(fetch_exception_v_li1)
      ,.fetch_exception_v_i2(fetch_exception_v_li2)
      ,.fetch_br_metadata_fwd_o(fetch_br_metadata_fwd_lo)
-     ,.fetch_pc_o1(fetch_pc_lo1)
+     ,.fetch_pc_o1(fetch_pc_lo1)//pass pc value for fetched instr
      ,.fetch_pc_o2(fetch_pc_lo2)
-     ,.attaboy_pc_i(attaboy_pc_li)
+     ,.attaboy_pc_i(attaboy_pc_li)//attaboy pc location and information
      ,.attaboy_br_metadata_fwd_i(attaboy_br_metadata_fwd_li)
      ,.attaboy_taken_i(attaboy_taken_li)
      ,.attaboy_ntaken_i(attaboy_ntaken_li)
@@ -171,6 +180,8 @@ module bp_fe_top
      ,.attaboy_yumi_o(attaboy_yumi_lo)
      );
 
+
+//signals to determine if current instr running has particular feature
 //reset
   wire state_reset_v          = (fe_cmd_v_i & (fe_cmd_cast_i.opcode == e_op_state_reset));
 //redirect signal 
@@ -191,7 +202,7 @@ module bp_fe_top
   wire cmd_nonattaboy_v       = (fe_cmd_v_i & (fe_cmd_cast_i.opcode != e_op_attaboy)) ;
   wire cmd_complex_v          = (state_reset_v | itlb_fill_v | icache_fence_v | itlb_fence_v);
 //immediate value jump?
-//icache populated while redirect so prob jump
+//icache populating while redirect so prob jump while loading new data
   wire cmd_immediate_v        = (pc_redirect_v | icache_fill_response_v);
 
 //miss general, miss br taken, miss not taken, miss not a branch (jump, ras, etc.)
@@ -305,12 +316,16 @@ module bp_fe_top
   assign w_tlb_entry_li = fe_cmd_cast_i.operands.itlb_fill_response.pte_leaf;
 
 //extended address we are trying to read from
-  wire [dword_width_gp-1:0] r_eaddr_li = `BSG_SIGN_EXTEND(next_pc_lo, dword_width_gp);
+//doubled to find memory in mmu
+  wire [dword_width_gp-1:0] r_eaddr_li = `BSG_SIGN_EXTEND(next_pc_lo1, dword_width_gp);
+  wire [dword_width_gp-1:0] r_eaddr_li2 = `BSG_SIGN_EXTEND(next_pc_lo2, dword_width_gp);
 
   //raed size?
   wire [1:0] r_size_li = 2'b10;
 
   //memory map unit
+  //NEED TO FIX IMMU TO SUPPORT 2 INSTR
+  //Necessary to handle and indicate exceptions for BOTH instr running
   bp_mmu
    #(.bp_params_p(bp_params_p)
      ,.tlb_els_4k_p(itlb_els_4k_p)
@@ -339,10 +354,10 @@ module bp_fe_top
      ,.r_instr_i(1'b1)
      ,.r_load_i('0)
      ,.r_store_i('0)
-     ,.r_eaddr_i(r_eaddr_li)
+     ,.r_eaddr_i(r_eaddr_li) //would add another port for two addresses but dont want two tlbs
      ,.r_size_i(r_size_li)
 
-     ,.r_v_o(ptag_v_li)
+     ,.r_v_o(ptag_v_li) //update output mmu features
      ,.r_ptag_o(ptag_li)
      ,.r_instr_miss_o(ptag_miss_li)
      ,.r_load_miss_o()
@@ -490,7 +505,10 @@ module bp_fe_top
 //instr exception, fail, or fetch
   assign fetch_exception_v_li = fe_queue_v_o & fe_exception_v;
   assign fetch_fail_v_li      = v_if2_r & ~fe_queue_v_o;
-  assign fetch_li             = icache_data_lo;
+
+  //update for both fetches
+  assign fetch_li1 = icache_data_lo1;
+  assign fetch_li2 = icache_data_lo2;
 
 //decode instr so we can NO-OP if needed
 bp_fe_instr_scan_s fetch1_decoded, fetch2_decoded;

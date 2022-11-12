@@ -31,26 +31,26 @@ module bp_mmu
 
    , input                                            r_v_i
    , input                                            r_instr_i
-   , input                                            r_load_i
+   , input                                            r_load_i//set to 0 in top
    , input                                            r_store_i
-   , input [dword_width_gp-1:0]                       r_eaddr_i
+   , input [dword_width_gp-1:0]                       r_eaddr_i//, r_eaddr_i2//two addresses
    , input [1:0]                                      r_size_i
 
-   , output logic                                     r_v_o
-   , output logic [ptag_width_p-1:0]                  r_ptag_o
-   , output logic                                     r_instr_miss_o
+   , output logic                                     r_v_o//, r_v_o2//valid out need 2
+   , output logic [ptag_width_p-1:0]                  r_ptag_o//, r_ptag_o2//output two tags
+   , output logic                                     r_instr_miss_o//,r_instr_miss_o2//output two misses
    , output logic                                     r_load_miss_o
    , output logic                                     r_store_miss_o
-   , output logic                                     r_uncached_o
-   , output logic                                     r_nonidem_o
-   , output logic                                     r_dram_o
+   , output logic                                     r_uncached_o//, r_uncached_o2//double
+   , output logic                                     r_nonidem_o//, r_nonidem_o2//double
+   , output logic                                     r_dram_o//, r_dram_o2//double
    , output logic                                     r_instr_access_fault_o
    , output logic                                     r_load_access_fault_o
    , output logic                                     r_store_access_fault_o
-   , output logic                                     r_instr_misaligned_o
+   , output logic                                     r_instr_misaligned_o//, r_instr_misaligned_o2//double
    , output logic                                     r_load_misaligned_o
    , output logic                                     r_store_misaligned_o
-   , output logic                                     r_instr_page_fault_o
+   , output logic                                     r_instr_page_fault_o//, r_instr_page_fault_o2//double
    , output logic                                     r_load_page_fault_o
    , output logic                                     r_store_page_fault_o
    );
@@ -68,8 +68,11 @@ module bp_mmu
      ,.data_o({mxr_r, sum_r, priv_mode_r, trans_en_r, r_v_r, r_instr_r, r_load_r, r_store_r})
      );
 
-  logic [etag_width_p-1:0] r_etag_r;
+  logic [etag_width_p-1:0] r_etag_r,r_etag_r2;
   wire [etag_width_p-1:0] r_etag_li = r_eaddr_i[dword_width_gp-1-:etag_width_p];
+  //wire [etag_width_p-1:0] r_etag_li2 = r_eaddr_i2[dword_width_gp-1-:etag_width_p];
+
+
   bsg_dff_reset
    #(.width_p(etag_width_p))
    etag_reg
@@ -80,8 +83,21 @@ module bp_mmu
      ,.data_o(r_etag_r)
      );
 
-  logic tlb_bypass_r;
+  // bsg_dff_reset
+  //  #(.width_p(etag_width_p))
+  //  etag_reg2
+  //   (.clk_i(clk_i)
+  //    ,.reset_i(reset_i)
+
+  //    ,.data_i(r_etag_li2)
+  //    ,.data_o(r_etag_r2)
+  //    );
+
+  logic tlb_bypass_r, tlb_bypass_r2;
   wire tlb_bypass = ~w_v_i & (r_etag_li[0+:vtag_width_p] == r_etag_r[0+:vtag_width_p]) & r_v_r & trans_en_r & trans_en_i;
+  //wire tlb_bypass2 = ~w_v_i & (r_etag_li2[0+:vtag_width_p] == r_etag_r2[0+:vtag_width_p]) & r_v_r & trans_en_r & trans_en_i;
+
+
   bsg_dff_reset
    #(.width_p(1))
    tlb_bypass_reg
@@ -90,6 +106,15 @@ module bp_mmu
      ,.data_i(tlb_bypass)
      ,.data_o(tlb_bypass_r)
      );
+
+  // bsg_dff_reset
+  //  #(.width_p(1))
+  //  tlb_bypass_reg2
+  //   (.clk_i(clk_i)
+  //    ,.reset_i(reset_i)
+  //    ,.data_i(tlb_bypass2)
+  //    ,.data_o(tlb_bypass_r2)
+  //    );
 
   logic tlb_r_v_lo;
   bp_pte_leaf_s tlb_r_entry_lo;

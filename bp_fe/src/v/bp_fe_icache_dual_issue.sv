@@ -67,13 +67,13 @@ module bp_fe_icache
    , input [ptag_width_p-1:0]                         ptag_i1
    ,                                                  ptag_i2
    , input                                            ptag_v_i1
-   ,                                                  ptag_v_i2
+  //  ,                                                  ptag_v_i2
    , input                                            ptag_uncached_i1
-   ,                                                  ptag_uncached_i2
+  //  ,                                                  ptag_uncached_i2
    , input                                            ptag_nonidem_i1
-   ,                                                  ptag_nonidem_i2
+  //  ,                                                  ptag_nonidem_i2
    , input                                            ptag_dram_i1
-   ,                                                  ptag_dram_i2
+  //  ,                                                  ptag_dram_i2
    //dont know if I need to add another poison. Adding one anyways
    , input                                            poison_tl_i1, poison_tl_i2
 
@@ -118,6 +118,9 @@ module bp_fe_icache
    , output logic [icache_stat_info_width_lp-1:0]     stat_mem1_o, stat_mem2_o
    );
 
+
+
+//UPDATE: LOOK UP UCE AND ADJUST
   //declaring parameters for the system here
   `declare_bp_cache_engine_if(paddr_width_p, ctag_width_p, sets_p, assoc_p, dword_width_gp, block_width_p, fill_width_p, icache);
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
@@ -151,7 +154,7 @@ module bp_fe_icache
   logic v_tl_r2, v_tv_r2;
   // Uncached storage
   //double this
-  logic [dword_width_gp-1:0] uncached_data_r;
+  logic [dword_width_gp-1:0] uncached_data_r1, uncached_data_r2;
   logic uncached_pending_r;
 
   /////////////////////////////////////////////////////////////////////////////
@@ -210,6 +213,7 @@ module bp_fe_icache
    tag_mem
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
+
      ,.a_data_i(tag_mem_data_li1)
      ,.a_addr_i(tag_mem_addr_li1)
      ,.a_v_i(tag_mem_v_li1)
@@ -571,7 +575,7 @@ module bp_fe_icache
      ,.data_o(final_data2)
      );
 
-// data out and whether it is valid
+// data out and whether it is valid and cached
   assign data_o1 = uncached_op_tv_r1 ? uncached_data_r1 : final_data1;
   assign data_v_o1 = v_tv_r1 & ((uncached_op_tv_r1 & uncached_pending_r1)
                               | (cached_op_tv_r1 & cached_hit_tv_r1)
