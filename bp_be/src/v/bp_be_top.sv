@@ -105,24 +105,24 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status_i(isd_status)
-     ,.expected_npc_o(expected_npc_lo)
+     ,.isd_status_i(isd_status) // from scheduler
+     ,.expected_npc_o(expected_npc_lo) // to scheduler
 
-     ,.fe_cmd_o(fe_cmd_o)
-     ,.fe_cmd_v_o(fe_cmd_v_o)
-     ,.fe_cmd_yumi_i(fe_cmd_yumi_i)
+     ,.fe_cmd_o(fe_cmd_o) // BE output
+     ,.fe_cmd_v_o(fe_cmd_v_o) // BE output
+     ,.fe_cmd_yumi_i(fe_cmd_yumi_i) // BE input
 
-     ,.unfreeze_o(unfreeze_lo)
-     ,.suppress_iss_o(suppress_iss_lo)
-     ,.poison_isd_o(poison_isd_lo)
-     ,.irq_waiting_i(irq_waiting_lo)
+     ,.unfreeze_o(unfreeze_lo) // to scheduler
+     ,.suppress_iss_o(suppress_iss_lo) // to scheduler
+     ,.poison_isd_o(poison_isd_lo) // to scheduler
+     ,.irq_waiting_i(irq_waiting_lo) // from calculator
      ,.cmd_empty_n_o()
      ,.cmd_empty_r_o()
-     ,.cmd_full_n_o(cmd_full_n_lo)
-     ,.cmd_full_r_o(cmd_full_r_lo)
+     ,.cmd_full_n_o(cmd_full_n_lo) // to calculator
+     ,.cmd_full_r_o(cmd_full_r_lo) // to detector
 
-     ,.br_pkt_i(br_pkt)
-     ,.commit_pkt_i(commit_pkt)
+     ,.br_pkt_i(br_pkt) // from calculator
+     ,.commit_pkt_i(commit_pkt) // from calculator
      );
 
   bp_be_detector
@@ -133,22 +133,22 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status_i(isd_status)
-     ,.cmd_full_i(cmd_full_r_lo)
-     ,.credits_full_i(cache_req_credits_full_i)
-     ,.credits_empty_i(cache_req_credits_empty_i)
-     ,.mem_ready_i(mem_ready_lo)
-     ,.fdiv_ready_i(fdiv_ready_lo)
-     ,.idiv_ready_i(idiv_ready_lo)
-     ,.ptw_busy_i(ptw_busy_lo)
-     ,.irq_pending_i(irq_pending_lo)
+     ,.isd_status_i(isd_status) // from scheduler
+     ,.cmd_full_i(cmd_full_r_lo) // from director
+     ,.credits_full_i(cache_req_credits_full_i) // BE input
+     ,.credits_empty_i(cache_req_credits_empty_i) // BE input
+     ,.mem_ready_i(mem_ready_lo) // from calculator
+     ,.fdiv_ready_i(fdiv_ready_lo) // from calculator
+     ,.idiv_ready_i(idiv_ready_lo) // from calculator
+     ,.ptw_busy_i(ptw_busy_lo) // from calculator
+     ,.irq_pending_i(irq_pending_lo)  // from calculator
 
-     ,.dispatch_v_o(dispatch_v)
-     ,.interrupt_v_o(interrupt_v)
-     ,.dispatch_pkt_i(dispatch_pkt)
-     ,.commit_pkt_i(commit_pkt)
-     ,.iwb_pkt_i(iwb_pkt)
-     ,.fwb_pkt_i(fwb_pkt)
+     ,.dispatch_v_o(dispatch_v) // to scheduler
+     ,.interrupt_v_o(interrupt_v) // to scheduler
+     ,.dispatch_pkt_i(dispatch_pkt) // from scheduler
+     ,.commit_pkt_i(commit_pkt) // from calculator
+     ,.iwb_pkt_i(iwb_pkt) // from calculator
+     ,.fwb_pkt_i(fwb_pkt) // from calculator
      );
 
   bp_be_scheduler
@@ -158,25 +158,25 @@ module bp_be_top
      ,.reset_i(reset_i)
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status_o(isd_status)
-     ,.expected_npc_i(expected_npc_lo)
-     ,.poison_isd_i(poison_isd_lo)
-     ,.dispatch_v_i(dispatch_v)
-     ,.interrupt_v_i(interrupt_v)
-     ,.unfreeze_i(unfreeze_lo)
-     ,.suppress_iss_i(suppress_iss_lo)
-     ,.decode_info_i(decode_info_lo)
+     ,.isd_status_o(isd_status) // to detector & director
+     ,.expected_npc_i(expected_npc_lo) // from director
+     ,.poison_isd_i(poison_isd_lo) // from director
+     ,.dispatch_v_i(dispatch_v) // from detector
+     ,.interrupt_v_i(interrupt_v) // from detector
+     ,.unfreeze_i(unfreeze_lo) // from director
+     ,.suppress_iss_i(suppress_iss_lo) // from director
+     ,.decode_info_i(decode_info_lo) // from calculator
 
-     ,.fe_queue_i(fe_queue_i)
-     ,.fe_queue_v_i(fe_queue_v_i)
-     ,.fe_queue_ready_o(fe_queue_ready_o)
+     ,.fe_queue_i(fe_queue_i) //BE input
+     ,.fe_queue_v_i(fe_queue_v_i) //BE input
+     ,.fe_queue_ready_o(fe_queue_ready_o) //BE output
 
-     ,.dispatch_pkt_o(dispatch_pkt)
+     ,.dispatch_pkt_o(dispatch_pkt) // to detector & calculator
 
-     ,.commit_pkt_i(commit_pkt)
-     ,.ptw_fill_pkt_i(ptw_fill_pkt)
-     ,.iwb_pkt_i(iwb_pkt)
-     ,.fwb_pkt_i(fwb_pkt)
+     ,.commit_pkt_i(commit_pkt) // from calculator
+     ,.ptw_fill_pkt_i(ptw_fill_pkt) // from calculator
+     ,.iwb_pkt_i(iwb_pkt) // from calculator
+     ,.fwb_pkt_i(fwb_pkt) // from calculator
      );
 
   bp_be_calculator_top
@@ -187,20 +187,21 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.dispatch_pkt_i(dispatch_pkt)
+     ,.dispatch_pkt_i(dispatch_pkt) // from scheduler
 
-     ,.decode_info_o(decode_info_lo)
-     ,.mem_ready_o(mem_ready_lo)
-     ,.idiv_ready_o(idiv_ready_lo)
-     ,.fdiv_ready_o(fdiv_ready_lo)
-     ,.ptw_busy_o(ptw_busy_lo)
+     ,.decode_info_o(decode_info_lo) // to scheduler
+     ,.mem_ready_o(mem_ready_lo) // to detector
+     ,.idiv_ready_o(idiv_ready_lo) // to detector
+     ,.fdiv_ready_o(fdiv_ready_lo) // to detector
+     ,.ptw_busy_o(ptw_busy_lo) // to detector
 
-     ,.br_pkt_o(br_pkt)
-     ,.commit_pkt_o(commit_pkt)
-     ,.ptw_fill_pkt_o(ptw_fill_pkt)
-     ,.iwb_pkt_o(iwb_pkt)
-     ,.fwb_pkt_o(fwb_pkt)
+     ,.br_pkt_o(br_pkt) // to director
+     ,.commit_pkt_o(commit_pkt) // to detector & director & scheduler
+     ,.ptw_fill_pkt_o(ptw_fill_pkt) // to scheduler
+     ,.iwb_pkt_o(iwb_pkt) // to detector & scheduler
+     ,.fwb_pkt_o(fwb_pkt) // to detector & scheduler
 
+     //cache interface
      ,.cache_req_o(cache_req_o)
      ,.cache_req_metadata_o(cache_req_metadata_o)
      ,.cache_req_v_o(cache_req_v_o)
@@ -213,16 +214,19 @@ module bp_be_top
      ,.cache_req_credits_full_i(cache_req_credits_full_i)
      ,.cache_req_credits_empty_i(cache_req_credits_empty_i)
 
+     //tag mem interface
      ,.tag_mem_pkt_v_i(tag_mem_pkt_v_i)
      ,.tag_mem_pkt_i(tag_mem_pkt_i)
      ,.tag_mem_o(tag_mem_o)
      ,.tag_mem_pkt_yumi_o(tag_mem_pkt_yumi_o)
-
+     
+     // data mem interface
      ,.data_mem_pkt_v_i(data_mem_pkt_v_i)
      ,.data_mem_pkt_i(data_mem_pkt_i)
      ,.data_mem_o(data_mem_o)
      ,.data_mem_pkt_yumi_o(data_mem_pkt_yumi_o)
 
+     // Stat mem interface
      ,.stat_mem_pkt_v_i(stat_mem_pkt_v_i)
      ,.stat_mem_pkt_i(stat_mem_pkt_i)
      ,.stat_mem_o(stat_mem_o)
@@ -233,9 +237,9 @@ module bp_be_top
      ,.software_irq_i(software_irq_i)
      ,.m_external_irq_i(m_external_irq_i)
      ,.s_external_irq_i(s_external_irq_i)
-     ,.irq_pending_o(irq_pending_lo)
-     ,.irq_waiting_o(irq_waiting_lo)
-     ,.cmd_full_n_i(cmd_full_n_lo)
+     ,.irq_pending_o(irq_pending_lo) // to detector
+     ,.irq_waiting_o(irq_waiting_lo) // to director
+     ,.cmd_full_n_i(cmd_full_n_lo) // from director
      );
 
 endmodule

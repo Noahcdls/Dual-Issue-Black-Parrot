@@ -12,6 +12,9 @@
  *       be an issue.  An alternative would be to save the read data, but that's more flops / power
  *   - Should we read the regfile at all for x0? The memory will be a power of 2 size, so it comes
  *       down to if writing / reading x0 and then muxing is less power than checking x == 0 on input.
+ *
+ * Modifications:
+ *   1. width to be doubled
  */
 
 `include "bp_common_defines.svh"

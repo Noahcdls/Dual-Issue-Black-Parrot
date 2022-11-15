@@ -35,13 +35,18 @@ module bp_be_scheduler
    , input                             reset_i
    , input [cfg_bus_width_lp-1:0]      cfg_bus_i
 
+    // to detector & director
   , output [isd_status_width_lp-1:0]   isd_status_o
+    // from director
   , input [vaddr_width_p-1:0]          expected_npc_i
   , input                              poison_isd_i
+    // from detector
   , input                              dispatch_v_i
   , input                              interrupt_v_i
+    // from director
   , input                              suppress_iss_i
   , input                              unfreeze_i
+    // from calculator
   , input [decode_info_width_lp-1:0]   decode_info_i
 
   // Fetch interface
@@ -49,9 +54,10 @@ module bp_be_scheduler
   , input                              fe_queue_v_i
   , output                             fe_queue_ready_o
 
-  // Dispatch interface
+  // Dispatch interface 
   , output [dispatch_pkt_width_lp-1:0] dispatch_pkt_o
 
+  // from calculator
   , input [commit_pkt_width_lp-1:0]    commit_pkt_i
   , input [wb_pkt_width_lp-1:0]        iwb_pkt_i
   , input [wb_pkt_width_lp-1:0]        fwb_pkt_i
@@ -82,10 +88,11 @@ module bp_be_scheduler
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.clr_v_i(fe_queue_clr_li)
-     ,.deq_v_i(fe_queue_deq_li)
-     ,.roll_v_i(fe_queue_roll_li)
-
+     ,.clr_v_i(fe_queue_clr_li) // from director
+     ,.deq_v_i(fe_queue_deq_li) // from calculator
+     ,.roll_v_i(fe_queue_roll_li) // from calculator
+     
+     // from Fe
      ,.fe_queue_i(fe_queue_i)
      ,.fe_queue_v_i(fe_queue_v_i)
      ,.fe_queue_ready_o(fe_queue_ready_o)
