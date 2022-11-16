@@ -64,27 +64,19 @@ module bp_fe_icache
 
    // Cycle 1: "Tag Lookup"
    // TLB and PMA information comes in this cycle
-   , input [ptag_width_p-1:0]                         ptag_i1
-   ,                                                  ptag_i2
-   , input                                            ptag_v_i1
-  //  ,                                                  ptag_v_i2
-   , input                                            ptag_uncached_i1
-  //  ,                                                  ptag_uncached_i2
-   , input                                            ptag_nonidem_i1
-  //  ,                                                  ptag_nonidem_i2
-   , input                                            ptag_dram_i1
-  //  ,                                                  ptag_dram_i2
+   , input [ptag_width_p-1:0]                         ptag_i1, ptag_i2
+   , input                                            ptag_v_i1, ptag_v_i2
+   , input                                            ptag_uncached_i1, ptag_uncached_i2
+   , input                                            ptag_nonidem_i1, ptag_nonidem_i2
+   , input                                            ptag_dram_i1, ptag_dram_i2
    //dont know if I need to add another poison. Adding one anyways
    , input                                            poison_tl_i1, poison_tl_i2
 
    // Cycle 2: "Tag Verify"
    // Data (or miss result) comes out of the cache
-   , output logic [instr_width_gp-1:0]                data_o1
-   ,                                                  data_o2
-   , output logic                                     data_v_o1
-   ,                                                  data_v_o2
-   , output logic                                     miss_v_o1
-   ,                                                  miss_v_o2
+   , output logic [instr_width_gp-1:0]                data_o1, data_o2
+   , output logic                                     data_v_o1, data_v_o2
+   , output logic                                     miss_v_o1, miss_v_o2
 
    // Cache Engine Interface
    // This is considered the "slow path", handling uncached requests
@@ -271,7 +263,7 @@ module bp_fe_icache
     end
 
   /////////////////////////////////////////////////////////////////////////////
-  // TL stage
+  // TL stage: TABLE LOOKUP
   /////////////////////////////////////////////////////////////////////////////
 
   //Look up address and whether the operation is to fill, fetch, or fence
@@ -283,6 +275,7 @@ module bp_fe_icache
   // Valid when we accept new data, clear when we advance to tv
   //D flip flop to pass write enable by giving ready and valid
   assign tl_we1 = ready_o1 & v_i1;
+  assign t1_we2 = ready_o2 & v_i2;
   bsg_dff_reset_set_clear
    #(.width_p(1))
    v_tl_reg1
@@ -356,11 +349,11 @@ module bp_fe_icache
   wire fill_tl1           = (fill_op_tl_r1 | ~ptag_nonidem_i1);
   wire dram_tl1           = (fill_op_tl_r1 | fetch_op_tl_r1) & ptag_dram_i1;
 
-  wire cached_hit_tl     = |hit_v_tl2;
-  wire fetch_uncached_tl = (fetch_op_tl_r2 &  ptag_uncached_i2);
-  wire fetch_cached_tl   = (fetch_op_tl_r2 & ~ptag_uncached_i2);
-  wire fill_tl           = (fill_op_tl_r2 | ~ptag_nonidem_i2);
-  wire dram_tl           = (fill_op_tl_r2 | fetch_op_tl_r2) & ptag_dram_i2;
+  wire cached_hit_tl2     = |hit_v_tl2;
+  wire fetch_uncached_tl2 = (fetch_op_tl_r2 &  ptag_uncached_i2);
+  wire fetch_cached_tl2   = (fetch_op_tl_r2 & ~ptag_uncached_i2);
+  wire fill_tl2           = (fill_op_tl_r2 | ~ptag_nonidem_i2);
+  wire dram_tl2           = (fill_op_tl_r2 | fetch_op_tl_r2) & ptag_dram_i2;
 
   //one hot encode the virtual address bank
   logic [assoc_p-1:0] bank_sel_one_hot_tl1, bank_sel_one_hot_tl2;
@@ -378,7 +371,7 @@ module bp_fe_icache
      );
 
   /////////////////////////////////////////////////////////////////////////////
-  // TV stage
+  // TV stage: TABLE VALIDATE
   /////////////////////////////////////////////////////////////////////////////
 
   //passing on physical address, way, hot one select, cached hit, and other status as well as load data in the verify
@@ -471,7 +464,7 @@ module bp_fe_icache
    #(.width_p(paddr_width_p+3*assoc_p+6))
    tv_stage_reg2
     (.clk_i(clk_i)
-     ,.en_i(tv_we)
+     ,.en_i(tv_we2)
      ,.data_i({paddr_tl2
                ,bank_sel_one_hot_tl2, way_v_tl2, hit_v_tl2, cached_hit_tl2
                ,fill_tl2, dram_tl2, fencei_op_tl_r2, fetch_uncached_tl2, fetch_cached_tl2
@@ -583,10 +576,10 @@ module bp_fe_icache
   assign miss_v_o1 = v_tv_r1 & ~fill_tv_r1 & ~data_v_o1;
 
   assign data_o2 = uncached_op_tv_r2 ? uncached_data_r2 : final_data2;
-  assign data_v_o1 = v_tv_r2 & ((uncached_op_tv_r2 & uncached_pending_r2)
+  assign data_v_o2 = v_tv_r2 & ((uncached_op_tv_r2 & uncached_pending_r2)
                               | (cached_op_tv_r2 & cached_hit_tv_r2)
                               );
-  assign miss_v_o1 = v_tv_r2 & ~fill_tv_r2 & ~data_v_o2;
+  assign miss_v_o2 = v_tv_r2 & ~fill_tv_r2 & ~data_v_o2;
 
 
   ///////////////////////////
@@ -663,11 +656,11 @@ module bp_fe_icache
 
   wire cached_req1   = v_tv_r1 & cached_op_tv_r1 & fill_tv_r1 & ~cached_hit_tv_r1;
   wire uncached_req1 = v_tv_r1 & uncached_op_tv_r1 & fill_tv_r1 & ~uncached_pending_r1;
-  wire fencei_req1   = v_tv_r1 & fencei_op_tv_r1 & !coherent_p1;
+  wire fencei_req1   = v_tv_r1 & fencei_op_tv_r1 & !coherent_p;
 
   wire cached_req2   = v_tv_r2 & cached_op_tv_r2 & fill_tv_r2 & ~cached_hit_tv_r2;
   wire uncached_req2 = v_tv_r2 & uncached_op_tv_r2 & fill_tv_r2 & ~uncached_pending_r2;
-  wire fencei_req2   = v_tv_r2 & fencei_op_tv_r2 & !coherent_p2;
+  wire fencei_req2   = v_tv_r2 & fencei_op_tv_r2 & !coherent_p;
 
   assign cache_req1_v_o = |{uncached_req1, cached_req1, fencei_req1};
   assign cache_req2_v_o = |{uncached_req2, cached_req2, fencei_req2};
@@ -746,6 +739,8 @@ module bp_fe_icache
   //   e_ready  : Cache is ready to accept requests
   //   e_miss   : Cache is waiting for a cache request to be serviced
   /////////////////////////////////////////////////////////////////////////////
+
+  //FIX THE STATE MACHINE TO INCLUDE BOTH INSTR
   always_comb
     case (state_r)
       e_ready  : state_n = cache_req_yumi_i ? e_miss : e_ready;
