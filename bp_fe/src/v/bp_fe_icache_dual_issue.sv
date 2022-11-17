@@ -29,7 +29,7 @@
 `include "bp_common_defines.svh"
 `include "bp_fe_defines.svh"
 
-module bp_fe_icache
+module bp_fe_icache_dual_issue
  import bp_common_pkg::*;
  import bp_fe_pkg::*;
  #(parameter bp_params_e bp_params_p = e_bp_default_cfg
