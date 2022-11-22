@@ -651,6 +651,7 @@ module bp_fe_icache
   ///////////////////////////
   // Uncached Load Storage
   ///////////////////////////
+  //cache request accepted and running
   wire uncached_pending_set = cache_req_yumi_i & uncached_req;
   // Invalidate uncached data if the cache when we successfully complete the request
   wire uncached_pending_clear = poison_tl_i | data_v_o;

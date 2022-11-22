@@ -241,7 +241,7 @@ module bp_uce_DI
 //pass dirty data
   logic [block_width_p-1:0] dirty_data_r, dirty_data2_r;
   wire dirty_data_read = data_mem_pkt_v_o & (data_mem_pkt_cast_o.opcode == e_cache_data_mem_read);
-  wire dirty_data2_read = data_mem2_pkt_v_o & (data_mem2_pkt_o.opcode == e_cache_data_mem_read);
+  wire dirty_data2_read = data_mem2_pkt_v_o & (data_mem2_pkt_cast_o.opcode == e_cache_data_mem_read);
   bsg_dff_sync_read
    #(.width_p(block_width_p), .bypass_p(1))
    dirty_data_reg
@@ -403,7 +403,7 @@ module bp_uce_DI
      ,.msg_stream_mask_p(mem_cmd_payload_mask_gp)
      ,.fsm_stream_mask_p(mem_cmd_payload_mask_gp)
      )
-   uce_pump_out
+   uce_pump_out2
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -438,7 +438,7 @@ module bp_uce_DI
      ,.header_els_p(2)
      ,.data_els_p(2)
      )
-   uce_pump_in
+   uce_pump_in2
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -456,7 +456,7 @@ module bp_uce_DI
      ,.fsm_new_o(fsm_resp2_new)
      ,.fsm_done_o(fsm_resp2_done)
      ,.fsm_last_o(/* unused */)
-     );
+    );
 ///////////////////////////////////////////////////////////////////////////////
 
   // We check for uncached stores earlier than other requests, because they get sent out in ready
@@ -525,7 +525,7 @@ module bp_uce_DI
      ,.up_i(index_up)
 
      ,.count_o(index_cnt)
-     );
+    );
   wire index_done = (index_cnt == sets_p-1);
 
 //second counter for instr 2

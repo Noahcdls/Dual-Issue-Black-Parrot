@@ -93,6 +93,7 @@ module bp_fe_pc_gen
 
 //mux for next instruction
   always_comb
+    begin
     if (redirect_v_i) begin
         next_pc_o1 = redirect_pc_i;
         next_pc_o2 = redirect_pc_i + vaddr_width_p'(4);
@@ -115,6 +116,7 @@ module bp_fe_pc_gen
         next_pc_o1 = pc_plus4;
         next_pc_o2 =pc_plus8;
       end
+    end
   assign pc_if1_n1 = next_pc_o1;
   assign pc_if1_n2 = next_pc_o2;
 

@@ -41,40 +41,40 @@ module bp_fe_top
 //doubled
   //  , output logic [icache_req_width_lp-1:0]           cache_req_o
   //  , output logic                                     cache_req_v_o
-   , output logic [icache_req_width_lp-1:0]           cache_req_o1,cache_req_o2
-   , output logic                                     cache_req_v_o1, cache_req_v_o2
+   , output logic [icache_req_width_lp-1:0]           cache_req_o
+   , output logic                                     cache_req_v_o
 
 
 //cache request accepted from BE? at least accepted or busy to stop the cache
-   , input                                            cache_req1_yumi_i, cache_req2_yumi_i
-   , input                                            cache_req1_busy_i, cache_req2_busy_i
+   , input                                            cache_req_yumi_i
+   , input                                            cache_req_busy_i
 //output cache metadata about instr
-   , output logic [icache_req_metadata_width_lp-1:0]  cache_req1_metadata_o, cache_req2_metadata_o
-   , output logic                                     cache_req1_metadata_v_o, cache_req2_metadata_v_o
+   , output logic [icache_req_metadata_width_lp-1:0]  cache_req_metadata_o
+   , output logic                                     cache_req_metadata_v_o
 //tag and data for cache request
-   , input                                            cache_req1_critical_tag_i, cache_req2_critical_tag_i
-   , input                                            cache_req1_critical_data_i, cache_req2_critical_data_i
-   , input                                            cache_req1_complete_i, cache_req2_complete_i
-   , input                                            cache_req1_credits_full_i, cache_req2_credits_full_i
-   , input                                            cache_req1_credits_empty_i, cache_req2_credits_empty_i
+   , input                                            cache_req_critical_tag_i
+   , input                                            cache_req_critical_data_i
+   , input                                            cache_req_complete_i
+   , input                                            cache_req_credits_full_i
+   , input                                            cache_req_credits_empty_i
 
 //cache memory packet(PC or RAM?) and output
-   , input [icache_data_mem_pkt_width_lp-1:0]         data_mem1_pkt_i, data_mem2_pkt_i
-   , input                                            data_mem1_pkt_v_i, data_mem2_pkt_v_i
-   , output logic                                     data_mem1_pkt_yumi_o, data_mem2_pkt_yumi_o
-   , output logic [icache_block_width_p-1:0]          data_mem1_o, data_mem2_o 
+   , input [icache_data_mem_pkt_width_lp-1:0]         data_mem_pkt_i
+   , input                                            data_mem_pkt_v_i
+   , output logic                                     data_mem_pkt_yumi_o
+   , output logic [icache_block_width_p-1:0]          data_mem_o
 
 //tag pckt and output consumption
-   , input [icache_tag_mem_pkt_width_lp-1:0]          tag_mem1_pkt_i, tag_mem2_pkt_i
-   , input                                            tag_mem1_pkt_v_i, tag_mem2_pkt_v_i
-   , output logic                                     tag_mem1_pkt_yumi_o, tag_mem2_pkt_yumi_o
-   , output logic [icache_tag_info_width_lp-1:0]      tag_mem1_o, tag_mem2_o
+   , input [icache_tag_mem_pkt_width_lp-1:0]          tag_mem_pkt_i
+   , input                                            tag_mem_pkt_v_i
+   , output logic                                     tag_mem_pkt_yumi_o
+   , output logic [icache_tag_info_width_lp-1:0]      tag_mem_o
 
 //stat mem pkt and consumption
-   , input [icache_stat_mem_pkt_width_lp-1:0]         stat_mem1_pkt_i, stat_mem2_pkt_i
-   , input                                            stat_mem1_pkt_v_i, stat_mem2_pkt_v_i
-   , output logic                                     stat_mem1_pkt_yumi_o, stat_mem2_pkt_yumi_o
-   , output logic [icache_stat_info_width_lp-1:0]     stat_mem1_o, stat_mem2_o
+   , input [icache_stat_mem_pkt_width_lp-1:0]         stat_mem_pkt_i
+   , input                                            stat_mem_pkt_v_i
+   , output logic                                     stat_mem_pkt_yumi_o
+   , output logic [icache_stat_info_width_lp-1:0]     stat_mem_o
    );
 
 //decalre instruction parameters and width
@@ -131,7 +131,7 @@ module bp_fe_top
   logic [instr_width_gp-1:0] fetch_li1, fetch_li2;
   logic [vaddr_width_p-1:0] fetch_pc_lo1, fetch_pc_lo2;
   //valid instructions as well as exceptions for either
-  logic fetch_instr_v_li1, fetch_instr_v_li2, fetch_exception_v_li1, fetch_exception_v_li2, fetch_fail_v_li;
+  logic fetch_instr_v_li1, fetch_instr_v_li2, fetch_exception_v_li1, fetch_exception_v_li2, fetch_fail_v_li,fetch_fail_v_li2;
   //branch metadata provided by pc_gen
   bp_fe_branch_metadata_fwd_s fetch_br_metadata_fwd_lo;
   //next pc to feed to icache in next cycle
@@ -457,9 +457,9 @@ module bp_fe_top
   logic icache_poison_tl, icache_poison_tl2;
 
   //icache
-  bp_fe_icache_dual_issue
+bp_fe_icache_di_v2
    #(.bp_params_p(bp_params_p))
-   icache
+   icache1
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -467,87 +467,63 @@ module bp_fe_top
 
      ,.icache_pkt1_i(icache_pkt1)
      ,.icache_pkt2_i(icache_pkt2)
-     ,.v_i1(icache_v_li)
-     ,.v_i2(icache_v_li)
-     ,.ready_o1(icache_ready_lo)
-     ,.ready_o2(icache_ready_lo2)
+     ,.v_i(icache_v_li)
+     ,.v_i2(icache_v_li)     
+     ,.ready_o(icache_ready_lo)
+
+
+
 
      ,.ptag_i1(ptag_li)
-     //edit mmu
-     ,.ptag_i2(ptag_li2)
      ,.ptag_v_i1(ptag_v_li)
-     ,.ptag_v_i2(ptag_v_li2)
      ,.ptag_uncached_i1(ptag_uncached_li)
-     //update mmu
-     ,.ptag_uncached_i2(ptag_uncached_li2)
      ,.ptag_nonidem_i1(ptag_nonidem_li)
-     ,.ptag_nonidem_i2(ptag_nonidem_li2)
      ,.ptag_dram_i1(ptag_dram_li)
-     ,.ptag_dram_i2(ptag_dram_li2)
-     ,.poison_tl_i1(icache_poison_tl)
-     ,.poison_tl_i2(icache_poison_tl)//probably dont need double poison but nice to have
 
      ,.data_o1(icache_data_lo1)
-     ,.data_o2(icache_data_lo2)
      ,.data_v_o1(icache_data_v_lo)
+     ,.miss_v_o1(icache_miss_v_lo)
+
+     ,.icache_pkt_i2(icache_pkt2)
+     ,.ptag_i2(ptag_li2)
+     ,.ptag_v_i2(ptag_v_li2)
+     ,.ptag_uncached_i2(ptag_uncached_li2)
+     ,.ptag_nonidem_i2(ptag_nonidem_li2)
+     ,.ptag_dram_i2(ptag_dram_li2)
+     ,.poison_tl_i1(icache_poison_tl)
+     ,.poison_tl_i2(icache_poison_tl2)
+     ,.data_o2(icache_data_lo2)
      ,.data_v_o2(icache_data_v_lo2)
-     ,.miss_v_o(icache_miss_v_lo)
-     ,.miss_v_o(icache_miss_v_lo2)
+     ,.miss_v_o2(icache_miss_v_lo2)
+     ,.cache_req_o(cache_req_o)
+     ,.cache_req_v_o(cache_req_v_o)
+     ,.cache_req_yumi_i(cache_req_yumi_i)
+     ,.cache_req_busy_i(cache_req_busy_i)
+     ,.cache_req_metadata_o(cache_req_metadata_o)
+     ,.cache_req_metadata_v_o(cache_req_metadata_v_o)
+     ,.cache_req_critical_tag_i(cache_req_critical_tag_i)
+     ,.cache_req_critical_data_i(cache_req_critical_data_i)
+     ,.cache_req_complete_i(cache_req_complete_i)
+     ,.cache_req_credits_full_i(cache_req_credits_full_i)
+     ,.cache_req_credits_empty_i(cache_req_credits_empty_i)
 
-     ,.cache_req1_o(cache_req_o1)
-     ,.cache_req1_v_o(cache_req_v_o1)
-     ,.cache_req1_yumi_i(cache_req1_yumi_i)
-     ,.cache_req1_busy_i(cache_req1_busy_i)
-     ,.cache_req1_metadata_o(cache_req1_metadata_o)
-     ,.cache_req1_metadata_v_o(cache_req1_metadata_v_o)
-     ,.cache_req1_critical_tag_i(cache_req1_critical_tag_i)
-     ,.cache_req1_critical_data_i(cache_req1_critical_data_i)
-     ,.cache_req1_complete_i(cache_req1_complete_i)
-     ,.cache_req1_credits_full_i(cache_req1_credits_full_i)
-     ,.cache_req1_credits_empty_i(cache_req1_credits_empty_i)
+     ,.data_mem_pkt_i(data_mem_pkt_i)
+     ,.data_mem_pkt_v_i(data_mem_pkt_v_i)
+     ,.data_mem_pkt_yumi_o(data_mem_pkt_yumi_o)
+     ,.data_mem_o(data_mem_o)
 
-     ,.cache_req2_o(cache_req_o2)
-     ,.cache_req2_v_o(cache_req_v_o2)
-     ,.cache_req2_yumi_i(cache_req2_yumi_i)
-     ,.cache_req2_busy_i(cache_req2_busy_i)
-     ,.cache_req2_metadata_o(cache_req2_metadata_o)
-     ,.cache_req2_metadata_v_o(cache_req2_metadata_v_o)
-     ,.cache_req2_critical_tag_i(cache_req2_critical_tag_i)
-     ,.cache_req2_critical_data_i(cache_req2_critical_data_i)
-     ,.cache_req2_complete_i(cache_req2_complete_i)
-     ,.cache_req2_credits_full_i(cache_req2_credits_full_i)
-     ,.cache_req2_credits_empty_i(cache_req2_credits_empty_i)
+     ,.tag_mem_pkt_i(tag_mem_pkt_i)
+     ,.tag_mem_pkt_v_i(tag_mem_pkt_v_i)
+     ,.tag_mem_pkt_yumi_o(tag_mem_pkt_yumi_o)
+     ,.tag_mem_o(tag_mem_o)
 
-     ,.data_mem1_pkt_i(data_mem1_pkt_i)
-     ,.data_mem1_pkt_v_i(data_mem1_pkt_v_i)
-     ,.data_mem1_pkt_yumi_o(data_mem1_pkt_yumi_o)
-     ,.data_mem1_o(data_mem1_o)
-
-     ,.tag_mem1_pkt_i(tag_mem1_pkt_i)
-     ,.tag_mem1_pkt_v_i(tag_mem1_pkt_v_i)
-     ,.tag_mem1_pkt_yumi_o(tag_mem1_pkt_yumi_o)
-     ,.tag_mem1_o(tag_mem1_o)
-
-     ,.stat_mem1_pkt_v_i(stat_mem1_pkt_v_i)
-     ,.stat_mem1_pkt_i(stat_mem1_pkt_i)
-     ,.stat_mem1_pkt_yumi_o(stat_mem1_pkt_yumi_o)
-     ,.stat_mem1_o(stat_mem1_o)
-  
-     ,.data_mem2_pkt_i(data_mem2_pkt_i)
-     ,.data_mem2_pkt_v_i(data_mem2_pkt_v_i)
-     ,.data_mem2_pkt_yumi_o(data_mem2_pkt_yumi_o)
-     ,.data_mem2_o(data_mem2_o)
-
-     ,.tag_mem2_pkt_i(tag_mem2_pkt_i)
-     ,.tag_mem2_pkt_v_i(tag_mem2_pkt_v_i)
-     ,.tag_mem2_pkt_yumi_o(tag_mem2_pkt_yumi_o)
-     ,.tag_mem2_o(tag_mem2_o)
-
-     ,.stat_mem2_pkt_v_i(stat_mem2_pkt_v_i)
-     ,.stat_mem2_pkt_i(stat_mem2_pkt_i)
-     ,.stat_mem2_pkt_yumi_o(stat_mem2_pkt_yumi_o)
-     ,.stat_mem2_o(stat_mem2_o)
+     ,.stat_mem_pkt_v_i(stat_mem_pkt_v_i)
+     ,.stat_mem_pkt_i(stat_mem_pkt_i)
+     ,.stat_mem_pkt_yumi_o(stat_mem_pkt_yumi_o)
+     ,.stat_mem_o(stat_mem_o)
      );
+
+
 
 //pass instr errors and tlb miss cant find page for instr data
   logic itlb_miss_r, instr_misaligned_r, instr_access_fault_r, instr_page_fault_r;
@@ -580,7 +556,7 @@ module bp_fe_top
   wire v_if1_n2 = next_pc_yumi_li;
 //valid instr fetch 2 if prev valid (being passed), not poisoned (kicked out of cache), and fetch has not failed
   wire v_if2_n = v_if1_r & ~icache_poison_tl & ~fetch_fail_v_li;
-  wire v_if2_n2 = v_if1_r2 & ~icache_poison_tl & ~fetch_fail_v_li2;
+  wire v_if2_n2 = v_if1_r2 & ~icache_poison_tl2 & ~fetch_fail_v_li2;
   //pass the valid instruction status
   bsg_dff_reset
    #(.width_p(2))
@@ -612,8 +588,9 @@ module bp_fe_top
   wire fe_exception_v2 = v_if2_r2 & (instr_misaligned_r2 | instr_access_fault_r2 | instr_page_fault_r2 | itlb_miss_r2 | icache_miss_v_lo2);
 
 //valid front end instr if valid fetch2 and valid data out
-  wire fe_instr_v     = v_if2_r & icache_data_v_lo;
-  wire fe_instr_v2    = v_if2_r2 & icache_data_v_lo2;
+//only send out valid instructions if they are both valid
+  wire fe_instr_v     = v_if2_r & icache_data_v_lo & icache_data_v_lo2;
+  wire fe_instr_v2    = v_if2_r2 & icache_data_v_lo2 & icache_data_v_lo;
   //front end queue out (can feed queue) which comes from a ready queue,valid or exception instr, and attaboy (can keep going)
   assign fe_queue_v_o1 = fe_queue_ready_i1 & (fe_instr_v | fe_exception_v) & ~cmd_nonattaboy_v;
   assign fe_queue_v_o2 = fe_queue_ready_i2 & (fe_instr_v2 | fe_exception_v2) & ~cmd_nonattaboy_v;
