@@ -46,33 +46,50 @@ module bp_be_issue_queue
   logic cptr_jmp;
 
   // Operations
+  //enable queue to consume
   wire enq  = fe_queue_ready_o & fe_queue_v_i;
+  //dequeue
   wire deq  = deq_v_i;
+  //reading with consume
   wire read = fe_queue_yumi_i;
+  //valid clear
   wire clr  = clr_v_i;
+  //roll queue(rollback support)
   wire roll = roll_v_i;
 
+//reading increases queue length
+//writing catches up
+
+//read pointer jump
+//if we are rolling back, check point - read pointer + dequeue
+//if read just go to next spot
   assign rptr_jmp = roll
                     ? (cptr_r - rptr_r + (ptr_width_lp+1)'(deq))
                     : read
                        ? ((ptr_width_lp+1)'(1))
                        : ((ptr_width_lp+1)'(0));
+  //if clear, read - write + 1 if we are reading
   assign wptr_jmp = clr
                     ? (rptr_r - wptr_r + (ptr_width_lp+1)'(read))
                     : enq
                        ? ((ptr_width_lp+1)'(1))
                        : ((ptr_width_lp+1)'(0));
+  //checkpoint is if we are dequeueing at all and are removing something from the FIFO                     
   assign cptr_jmp = deq_v_i;
 
+// empty if read and write pointers are caught up
   wire empty = (rptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
                & (rptr_r[ptr_width_lp] == wptr_r[ptr_width_lp]);
+//empty followign stage if same condition
   wire empty_n = (rptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp])
                  & (rptr_n[ptr_width_lp] == wptr_n[ptr_width_lp]);
+  //full if lower bits match but upper dont (overflow bit)
   wire full  = (cptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
                & (cptr_r[ptr_width_lp] != wptr_r[ptr_width_lp]);
   wire full_n = (cptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp])
                 & (cptr_n[ptr_width_lp] != wptr_n[ptr_width_lp]);
 
+//wrap around pointer for checkpoint to determine where we are in the queue
   bsg_circular_ptr
    #(.slots_p(2*fe_queue_fifo_els_p), .max_add_p(1))
    cptr
@@ -82,7 +99,7 @@ module bp_be_issue_queue
      ,.o(cptr_r)
      ,.n_o(cptr_n)
      );
-
+//wrap around pointer for write and read
   bsg_circular_ptr
    #(.slots_p(2*fe_queue_fifo_els_p),.max_add_p(2*fe_queue_fifo_els_p-1))
    wptr
@@ -102,7 +119,7 @@ module bp_be_issue_queue
     ,.o(rptr_r)
     ,.n_o(rptr_n)
     );
-
+//read and write for FIFO queue
   bsg_mem_1r1w
   #(.width_p(fe_queue_width_lp), .els_p(fe_queue_fifo_els_p))
   queue_fifo_mem
@@ -115,6 +132,7 @@ module bp_be_issue_queue
     ,.r_addr_i(rptr_r[0+:ptr_width_lp])
     ,.r_data_o(fe_queue_cast_o)
     );
+  //queue is valid and ready
   assign fe_queue_v_o     = ~roll & ~empty;
   assign fe_queue_ready_o = ~clr & ~full;
 
@@ -124,6 +142,8 @@ module bp_be_issue_queue
   bp_be_issue_pkt_s issue_pkt_li, issue_pkt_lo;
   wire issue_v = (fe_queue_yumi_i & ~empty_n) | roll_v_i | (fe_queue_v_i & empty);
   wire bypass_reg = (wptr_r == rptr_n);
+
+  //write issue packets and so they can be deployed
   bsg_mem_1r1w
   #(.width_p($bits(bp_be_issue_pkt_s)), .els_p(fe_queue_fifo_els_p), .read_write_same_addr_p(1))
   reg_fifo_mem
@@ -137,7 +157,7 @@ module bp_be_issue_queue
     ,.r_data_o(issue_pkt_lo)
     );
   assign preissue_pkt_o = bypass_reg ? issue_pkt_li : issue_v ? issue_pkt_lo : '0;
-
+//packet issuing
   bsg_dff_reset_en
    #(.width_p($bits(bp_be_issue_pkt_s)))
    issue_reg
@@ -147,7 +167,7 @@ module bp_be_issue_queue
      ,.data_i(preissue_pkt_o)
      ,.data_o(issue_pkt_o)
      );
-
+//instruction decoding
   always_comb
     begin
       issue_pkt_li = '0;

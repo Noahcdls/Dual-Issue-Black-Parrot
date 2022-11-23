@@ -75,7 +75,10 @@ module bp_be_scheduler
   wire fe_queue_clr_li  = suppress_iss_i;
   wire fe_queue_deq_li  = commit_pkt_cast_i.queue_v;
   wire fe_queue_roll_li = commit_pkt_cast_i.npc_w_v;
-  bp_be_issue_pkt_s preissue_pkt, issue_pkt;
+  bp_be_issue_pkt_s preissue_pkt, issue_pkt, preissue_pkt2, issue_pkt2;
+  //need two preissue and issue pkt
+  //two fe_queue_lo
+
   bp_be_issue_queue
    #(.bp_params_p(bp_params_p))
    fe_queue_fifo
@@ -101,7 +104,7 @@ module bp_be_scheduler
   logic [dword_width_gp-1:0] irf_rs1, irf_rs2;
   bp_be_regfile
   #(.bp_params_p(bp_params_p), .read_ports_p(2), .zero_x0_p(1), .data_width_p(dword_width_gp))
-   int_regfile
+   int_regfile1
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -114,10 +117,30 @@ module bp_be_scheduler
      ,.rs_data_o({irf_rs2, irf_rs1})
      );
 
+  logic [dword_width_gp-1:0] irf2_rs1, irf2_rs2;
+  bp_be_regfile
+  #(.bp_params_p(bp_params_p), .read_ports_p(2), .zero_x0_p(1), .data_width_p(dword_width_gp))
+   int_regfile2
+    (.clk_i(clk_i)
+     ,.reset_i(reset_i)
+
+     ,.rd_w_v_i(iwb_pkt_cast_i.ird_w_v)
+     ,.rd_addr_i(iwb_pkt_cast_i.rd_addr)
+     ,.rd_data_i(iwb_pkt_cast_i.rd_data[0+:dword_width_gp])
+
+     ,.rs_r_v_i({preissue_pkt2.irs2_v, preissue_pkt2.irs1_v})
+     ,.rs_addr_i({preissue_pkt2.rs2_addr, preissue_pkt2.rs1_addr})
+     ,.rs_data_o({irf2_rs2, irf2_rs1})
+     );
+
+
+
+
+
   logic [dpath_width_gp-1:0] frf_rs1, frf_rs2, frf_rs3;
   bp_be_regfile
   #(.bp_params_p(bp_params_p), .read_ports_p(3), .zero_x0_p(0), .data_width_p(dpath_width_gp))
-   fp_regfile
+   fp_regfile1
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -130,6 +153,22 @@ module bp_be_scheduler
      ,.rs_data_o({frf_rs3, frf_rs2, frf_rs1})
      );
 
+  logic [dpath_width_gp-1:0] frf2_rs1, frf2_rs2, frf2_rs3;
+  bp_be_regfile
+  #(.bp_params_p(bp_params_p), .read_ports_p(3), .zero_x0_p(0), .data_width_p(dpath_width_gp))
+   fp_regfile2
+    (.clk_i(clk_i)
+     ,.reset_i(reset_i)
+
+     ,.rd_w_v_i(fwb_pkt_cast_i.frd_w_v)
+     ,.rd_addr_i(fwb_pkt_cast_i.rd_addr)
+     ,.rd_data_i(fwb_pkt_cast_i.rd_data)
+
+     ,.rs_r_v_i({preissue_pkt2.frs3_v, preissue_pkt2.frs2_v, preissue_pkt2.frs1_v})
+     ,.rs_addr_i({preissue_pkt2.rs3_addr, preissue_pkt2.rs2_addr, preissue_pkt2.rs1_addr})
+     ,.rs_data_o({frf2_rs3, frf2_rs2, frf2_rs1})
+     );    
+  
   // Decode the dispatched instruction
   bp_be_decode_s instr_decoded;
   logic [dword_width_gp-1:0] decoded_imm_lo;
@@ -160,15 +199,50 @@ module bp_be_scheduler
      ,.sfence_vma_o(sfence_vma_lo)
      );
 
+  bp_be_decode_s instr_decoded2;
+  logic [dword_width_gp-1:0] decoded_imm_lo2;
+  logic illegal_instr_lo2;
+  logic ecall_m_lo2, ecall_s_lo2, ecall_u_lo2;
+  logic ebreak_lo2, dbreak_lo2;
+  logic dret_lo2, mret_lo2, sret_lo2;
+  logic wfi_lo2, sfence_vma_lo2;
+  bp_be_instr_decoder
+   #(.bp_params_p(bp_params_p))
+   instr_decoder2
+    (.instr_i(fe_queue_lo2.msg.fetch.instr)
+     ,.decode_info_i(decode_info_i)
+
+     ,.decode_o(instr_decoded2)
+     ,.imm_o(decoded_imm_lo2)
+
+     ,.illegal_instr_o(illegal_instr_lo2)
+     ,.ecall_m_o(ecall_m_lo2)
+     ,.ecall_s_o(ecall_s_lo2)
+     ,.ecall_u_o(ecall_u_lo2)
+     ,.ebreak_o(ebreak_lo2)
+     ,.dbreak_o(dbreak_lo2)
+     ,.dret_o(dret_lo2)
+     ,.mret_o(mret_lo2)
+     ,.sret_o(sret_lo2)
+     ,.wfi_o(wfi_lo2)
+     ,.sfence_vma_o(sfence_vma_lo2)
+     );
+//page table walker = ptw to go through the multilevel page table
   wire fe_exc_not_instr_li = fe_queue_yumi_li & (fe_queue_lo.msg_type == e_fe_exception);
   wire [vaddr_width_p-1:0] fe_exc_vaddr_li = fe_queue_lo.msg.exception.vaddr;
   wire be_exc_not_instr_li = ptw_fill_pkt_cast_i.v | interrupt_v_i | unfreeze_i;
   wire [vaddr_width_p-1:0] be_exc_vaddr_li = ptw_fill_pkt_cast_i.vaddr;
   wire [dpath_width_gp-1:0] be_exc_data_li = ptw_fill_pkt_cast_i.entry;
 
+  wire fe_exc_not_instr_li2 = fe_queue_yumi_li & (fe_queue_lo2.msg_type == e_fe_exception);
+  wire [vaddr_width_p-1:0] fe_exc_vaddr_li2 = fe_queue_lo2.msg.exception.vaddr;
+  wire be_exc_not_instr_li2 = ptw_fill_pkt_cast_i.v | interrupt_v_i | unfreeze_i;
+  wire [vaddr_width_p-1:0] be_exc_vaddr_li2 = ptw_fill_pkt_cast_i.vaddr;
+  wire [dpath_width_gp-1:0] be_exc_data_li2 = ptw_fill_pkt_cast_i.entry;
+
   wire fe_instr_not_exc_li = fe_queue_yumi_li & (fe_queue_lo.msg_type == e_fe_fetch);
 
-  assign fe_queue_yumi_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v_i & ~be_exc_not_instr_li;
+  assign fe_queue_yumi_li = ~suppress_iss_i & ((fe_queue_v_lo & dispatch_v_i & ~be_exc_not_instr_li) | (fe_queue_v_lo2 & dispatch_v_i2 & ~be_exc_not_instr_li));
 
   bp_be_dispatch_pkt_s dispatch_pkt;
   always_comb
