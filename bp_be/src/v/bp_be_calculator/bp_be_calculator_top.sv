@@ -41,7 +41,8 @@ module bp_be_calculator_top
   , input [cfg_bus_width_lp-1:0]                    cfg_bus_i
 
   // Calculator - Checker interface
-  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i
+  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i_1
+  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i_2
 
   , output logic                                    idiv_ready_o
   , output logic                                    fdiv_ready_o
@@ -176,8 +177,10 @@ module bp_be_calculator_top
   bp_be_dispatch_pkt_s reservation_n, reservation_r;
   always_comb
     begin
+       // !!double the reservation
+       // !!wire int_reservation = reservation1.decode.pipe_int ? reservation1 : reservation2;
       reservation_n        = dispatch_pkt_i;
-      reservation_n.rs1    = bypass_rs[0];
+      reservation_n.rs1    = bypass_s[0];
       reservation_n.rs2    = bypass_rs[1];
       reservation_n.imm    = bypass_rs[2];
     end
@@ -253,6 +256,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
+      //!! reservation replacement
      ,.reservation_i(reservation_r)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
