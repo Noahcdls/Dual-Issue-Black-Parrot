@@ -242,12 +242,14 @@ module bp_be_scheduler
 
   wire fe_instr_not_exc_li = fe_queue_yumi_li & (fe_queue_lo.msg_type == e_fe_fetch);
 
+//we can continue sending more dispatches
   assign fe_queue_yumi_li = ~suppress_iss_i & ((fe_queue_v_lo & dispatch_v_i & ~be_exc_not_instr_li) | (fe_queue_v_lo2 & dispatch_v_i2 & ~be_exc_not_instr_li));
 
   bp_be_dispatch_pkt_s dispatch_pkt;
   always_comb
     begin
       // Calculator status ISD stage
+      //status info based off data out the queue and what is in the issue packet
       isd_status_cast_o = '0;
       isd_status_cast_o.v        = fe_queue_yumi_li;
       isd_status_cast_o.pc       = fe_queue_lo.msg.fetch.pc;
