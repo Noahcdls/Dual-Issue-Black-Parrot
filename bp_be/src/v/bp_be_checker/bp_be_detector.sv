@@ -15,6 +15,7 @@
  *   2. doubled inputs: isd_status_i
  *   3. Calculator's bandwidth to be decided ()
  *   4. cmd_full_i, credits_full_i, credits_empty_i to be decided
+ *
  */
 
 `include "bp_common_defines.svh"
@@ -69,8 +70,8 @@ module bp_be_detector
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
-  `bp_cast_i(bp_be_isd_status1_s, isd_status1);
-  `bp_cast_i(bp_be_isd_status2_s, isd_status2);
+  `bp_cast_i(bp_be_isd_status_s, isd_status1);
+  `bp_cast_i(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
@@ -373,8 +374,8 @@ module bp_be_detector
     end
 
   // Generate calculator control signals
-  assign dispatch1_v_o  = ~(control_haz1_v | data_haz1_v | struct_haz1_v);
-  assign dispatch2_v_o  = ~(control_haz2_v | data_haz2_v | struct_haz2_v);
+  assign dispatch_v1_o  = ~(control_haz1_v | data_haz1_v | struct_haz1_v);
+  assign dispatch_v2_o  = ~(control_haz2_v | data_haz2_v | struct_haz2_v);
   assign interrupt_v_o = irq_pending_i & ~ptw_busy_i;
 
 

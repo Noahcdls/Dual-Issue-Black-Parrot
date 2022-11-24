@@ -9,6 +9,15 @@
  * Notes:
  *   It might make sense to use an enum for RISC-V opcodes rather than `defines.
  *   Floating point instruction decoding is not implemented, so we do not predecode.
+ *
+ * Modifications: 
+ *   1. doubled outputs: isd_status_o, dispatch_pkt_o
+ *   2. doubled inputs: dispatch_v_i
+ *   3. Fetch Interfaces doubled (fe_queue_i, fe_queue_v_i) to match Front End modifications
+ *   4. doubled internal ports: preissue_pkt, issue_pkt
+ *   5. Calculator's bandwidth to be decided 
+ *   6. cmd_full_i, credits_full_i, credits_empty_i to be decided
+ *   7. Issue Queue modified 
  */
 
 `include "bp_common_defines.svh"
@@ -36,12 +45,12 @@ module bp_be_scheduler
    , input [cfg_bus_width_lp-1:0]      cfg_bus_i
 
     // to detector & director
-  , output [isd_status_width_lp-1:0]   isd_status_o
+  , output [isd_status_width_lp-1:0]   isd_status1_o, isd_status2_o
     // from director
   , input [vaddr_width_p-1:0]          expected_npc_i
   , input                              poison_isd_i
     // from detector
-  , input                              dispatch_v_i
+  , input                              dispatch_v1_i, dispatch_v2_i
   , input                              interrupt_v_i
     // from director
   , input                              suppress_iss_i
@@ -50,12 +59,12 @@ module bp_be_scheduler
   , input [decode_info_width_lp-1:0]   decode_info_i
 
   // Fetch interface
-  , input [fe_queue_width_lp-1:0]      fe_queue_i
-  , input                              fe_queue_v_i
+  , input [fe_queue_width_lp-1:0]      fe_queue1_i, fe_queue2_i
+  , input                              fe_queue_v1_i, fe_queue_v2_i
   , output                             fe_queue_ready_o
 
   // Dispatch interface 
-  , output [dispatch_pkt_width_lp-1:0] dispatch_pkt_o
+  , output [dispatch_pkt_width_lp-1:0] dispatch_pkt1_o, dispatch_pkt2_o
 
   // from calculator
   , input [commit_pkt_width_lp-1:0]    commit_pkt_i
@@ -69,7 +78,8 @@ module bp_be_scheduler
   `declare_bp_core_if(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
-  `bp_cast_o(bp_be_isd_status_s, isd_status);
+  `bp_cast_o(bp_be_isd_status_s, isd_status1);
+  `bp_cast_o(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_ptw_fill_pkt_s, ptw_fill_pkt);
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
@@ -82,6 +92,8 @@ module bp_be_scheduler
   wire fe_queue_deq_li  = commit_pkt_cast_i.queue_v;
   wire fe_queue_roll_li = commit_pkt_cast_i.npc_w_v;
   bp_be_issue_pkt_s preissue_pkt, issue_pkt;
+  
+
   bp_be_issue_queue
    #(.bp_params_p(bp_params_p))
    fe_queue_fifo
@@ -93,16 +105,21 @@ module bp_be_scheduler
      ,.roll_v_i(fe_queue_roll_li) // from calculator
      
      // from Fe
-     ,.fe_queue_i(fe_queue_i)
-     ,.fe_queue_v_i(fe_queue_v_i)
+     ,.fe_queue1_i(fe_queue1_i)
+     ,.fe_queue2_i(fe_queue2_i)
+     ,.fe_queue_v1_i(fe_queue_v1_i)
+     ,.fe_queue_v2_i(fe_queue_v2_i)
      ,.fe_queue_ready_o(fe_queue_ready_o)
 
-     ,.fe_queue_o(fe_queue_lo)
+     ,.fe_queue1_o(fe_queue1_lo)
+     ,.fe_queue2_o(fe_queue2_lo)
      ,.fe_queue_v_o(fe_queue_v_lo)
      ,.fe_queue_yumi_i(fe_queue_yumi_li)
 
-     ,.preissue_pkt_o(preissue_pkt)
-     ,.issue_pkt_o(issue_pkt)
+     ,.preissue_pkt1_o(preissue_pkt1)
+     ,.preissue_pkt2_o(preissue_pkt2)
+     ,.issue_pkt1_o(issue_pkt1)
+     ,.issue_pkt2_o(issue_pkt2)
      );
 
   logic [dword_width_gp-1:0] irf_rs1, irf_rs2;
@@ -145,6 +162,7 @@ module bp_be_scheduler
   logic ebreak_lo, dbreak_lo;
   logic dret_lo, mret_lo, sret_lo;
   logic wfi_lo, sfence_vma_lo;
+  
   bp_be_instr_decoder
    #(.bp_params_p(bp_params_p))
    instr_decoder
@@ -175,31 +193,51 @@ module bp_be_scheduler
 
   wire fe_instr_not_exc_li = fe_queue_yumi_li & (fe_queue_lo.msg_type == e_fe_fetch);
 
-  assign fe_queue_yumi_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v_i & ~be_exc_not_instr_li;
+  assign fe_queue_yumi_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v1_i & dispatch_v2_i & ~be_exc_not_instr_li;
 
   bp_be_dispatch_pkt_s dispatch_pkt;
   always_comb
     begin
       // Calculator status ISD stage
-      isd_status_cast_o = '0;
-      isd_status_cast_o.v        = fe_queue_yumi_li;
-      isd_status_cast_o.pc       = fe_queue_lo.msg.fetch.pc;
-      isd_status_cast_o.branch_metadata_fwd = fe_queue_lo.msg.fetch.branch_metadata_fwd;
-      isd_status_cast_o.fence_v  = fe_queue_v_lo & issue_pkt.fence_v;
-      isd_status_cast_o.csr_v    = fe_queue_v_lo & issue_pkt.csr_v;
-      isd_status_cast_o.mem_v    = fe_queue_v_lo & issue_pkt.mem_v;
-      isd_status_cast_o.long_v   = fe_queue_v_lo & issue_pkt.long_v;
-      isd_status_cast_o.irs1_v   = fe_queue_v_lo & issue_pkt.irs1_v;
-      isd_status_cast_o.frs1_v   = fe_queue_v_lo & issue_pkt.frs1_v;
-      isd_status_cast_o.rs1_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs1_addr;
-      isd_status_cast_o.irs2_v   = fe_queue_v_lo & issue_pkt.irs2_v;
-      isd_status_cast_o.frs2_v   = fe_queue_v_lo & issue_pkt.frs2_v;
-      isd_status_cast_o.rs2_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs2_addr;
-      isd_status_cast_o.frs3_v   = fe_queue_v_lo & issue_pkt.frs3_v;
-      isd_status_cast_o.rs3_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs3_addr;
-      isd_status_cast_o.rd_addr  = fe_queue_lo.msg.fetch.instr.t.fmatype.rd_addr;
-      isd_status_cast_o.iwb_v    = instr_decoded.irf_w_v;
-      isd_status_cast_o.fwb_v    = instr_decoded.frf_w_v;
+      isd_status1_cast_o = '0;
+      isd_status1_cast_o.v        = fe_queue_yumi_li;
+      isd_status1_cast_o.pc       = fe_queue_lo.msg.fetch.pc;
+      isd_status1_cast_o.branch_metadata_fwd = fe_queue_lo.msg.fetch.branch_metadata_fwd;
+      isd_status1_cast_o.fence_v  = fe_queue_v_lo & issue_pkt.fence_v;
+      isd_status1_cast_o.csr_v    = fe_queue_v_lo & issue_pkt.csr_v;
+      isd_status1_cast_o.mem_v    = fe_queue_v_lo & issue_pkt.mem_v;
+      isd_status1_cast_o.long_v   = fe_queue_v_lo & issue_pkt.long_v;
+      isd_status1_cast_o.irs1_v   = fe_queue_v_lo & issue_pkt.irs1_v;
+      isd_status1_cast_o.frs1_v   = fe_queue_v_lo & issue_pkt.frs1_v;
+      isd_status1_cast_o.rs1_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs1_addr;
+      isd_status1_cast_o.irs2_v   = fe_queue_v_lo & issue_pkt.irs2_v;
+      isd_status1_cast_o.frs2_v   = fe_queue_v_lo & issue_pkt.frs2_v;
+      isd_status1_cast_o.rs2_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs2_addr;
+      isd_status1_cast_o.frs3_v   = fe_queue_v_lo & issue_pkt.frs3_v;
+      isd_status1_cast_o.rs3_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs3_addr;
+      isd_status1_cast_o.rd_addr  = fe_queue_lo.msg.fetch.instr.t.fmatype.rd_addr;
+      isd_status1_cast_o.iwb_v    = instr_decoded.irf_w_v;
+      isd_status1_cast_o.fwb_v    = instr_decoded.frf_w_v;
+
+      isd_status2_cast_o = '0;
+      isd_status2_cast_o.v        = fe_queue_yumi_li;
+      isd_status2_cast_o.pc       = fe_queue_lo.msg.fetch.pc;
+      isd_status2_cast_o.branch_metadata_fwd = fe_queue_lo.msg.fetch.branch_metadata_fwd;
+      isd_status2_cast_o.fence_v  = fe_queue_v_lo & issue_pkt.fence_v;
+      isd_status2_cast_o.csr_v    = fe_queue_v_lo & issue_pkt.csr_v;
+      isd_status2_cast_o.mem_v    = fe_queue_v_lo & issue_pkt.mem_v;
+      isd_status2_cast_o.long_v   = fe_queue_v_lo & issue_pkt.long_v;
+      isd_status2_cast_o.irs1_v   = fe_queue_v_lo & issue_pkt.irs1_v;
+      isd_status2_cast_o.frs1_v   = fe_queue_v_lo & issue_pkt.frs1_v;
+      isd_status2_cast_o.rs1_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs1_addr;
+      isd_status2_cast_o.irs2_v   = fe_queue_v_lo & issue_pkt.irs2_v;
+      isd_status2_cast_o.frs2_v   = fe_queue_v_lo & issue_pkt.frs2_v;
+      isd_status2_cast_o.rs2_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs2_addr;
+      isd_status2_cast_o.frs3_v   = fe_queue_v_lo & issue_pkt.frs3_v;
+      isd_status2_cast_o.rs3_addr = fe_queue_lo.msg.fetch.instr.t.fmatype.rs3_addr;
+      isd_status2_cast_o.rd_addr  = fe_queue_lo.msg.fetch.instr.t.fmatype.rd_addr;
+      isd_status2_cast_o.iwb_v    = instr_decoded.irf_w_v;
+      isd_status2_cast_o.fwb_v    = instr_decoded.frf_w_v;
 
       // Form dispatch packet
       dispatch_pkt = '0;

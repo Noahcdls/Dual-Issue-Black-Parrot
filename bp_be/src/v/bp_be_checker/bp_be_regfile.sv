@@ -14,7 +14,7 @@
  *       down to if writing / reading x0 and then muxing is less power than checking x == 0 on input.
  *
  * Modifications:
- *   1. width to be doubled
+ *   1. doubled inputs: 
  */
 
 `include "bp_common_defines.svh"
