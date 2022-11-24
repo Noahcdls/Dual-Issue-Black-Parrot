@@ -142,7 +142,7 @@ module bp_be_issue_queue
   bp_be_issue_pkt_s issue_pkt_li, issue_pkt_lo;
   wire issue_v = (fe_queue_yumi_i & ~empty_n) | roll_v_i | (fe_queue_v_i & empty);
   wire bypass_reg = (wptr_r == rptr_n);
-
+  //issue_pkts come from fe_queue instr that have been ID'd as instr
   //write issue packets and so they can be deployed
   bsg_mem_1r1w
   #(.width_p($bits(bp_be_issue_pkt_s)), .els_p(fe_queue_fifo_els_p), .read_write_same_addr_p(1))

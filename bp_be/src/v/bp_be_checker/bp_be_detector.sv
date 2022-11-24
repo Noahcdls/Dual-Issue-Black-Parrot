@@ -33,7 +33,7 @@ module bp_be_detector
    , input [cfg_bus_width_lp-1:0]      cfg_bus_i
 
    // Dependency information
-   , input [isd_status_width_lp-1:0]   isd_status_i
+   , input [isd_status_width_lp-1:0]   isd_status_i, isd_status2_i
    , input                             cmd_full_i
    , input                             credits_full_i
    , input                             credits_empty_i
@@ -44,12 +44,12 @@ module bp_be_detector
    , input                             irq_pending_i
 
    // Pipeline control signals from the checker to the calculator
-   , output logic                      dispatch_v_o
-   , output logic                      interrupt_v_o
-   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i
-   , input [commit_pkt_width_lp-1:0]   commit_pkt_i
-   , input [wb_pkt_width_lp-1:0]       iwb_pkt_i
-   , input [wb_pkt_width_lp-1:0]       fwb_pkt_i
+   , output logic                      dispatch_v_o, dispatch_v_o2//we can send the dispatch out
+   , output logic                      interrupt_v_o//interrupt to stop sys
+   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i, dispatch_pkt2_i
+   , input [commit_pkt_width_lp-1:0]   commit_pkt_i//commits
+   , input [wb_pkt_width_lp-1:0]       iwb_pkt_i //writeback for int
+   , input [wb_pkt_width_lp-1:0]       fwb_pkt_i//floating writeback
    );
 
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
@@ -57,20 +57,35 @@ module bp_be_detector
 
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
   `bp_cast_i(bp_be_isd_status_s, isd_status);
+  `bp_cast_i(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2)
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt);
 
   // Integer data hazards
+  //read after write, write after write, data
   logic irs1_sb_raw_haz_v, irs2_sb_raw_haz_v;
-  logic ird_sb_waw_haz_v;
+  logic irs1_sb_raw_haz_v2, irs2_sb_raw_haz_v2;
+
+  logic ird_sb_waw_haz_v, ird_sb_waw_haz_v2;
+  //full data hazards more cumulative dep on stage
   logic [2:0] irs1_data_haz_v , irs2_data_haz_v;
+  logic [2:0] irs1_data_haz_v2 , irs2_data_haz_v2;
   // Floating point data hazards
   logic frs1_sb_raw_haz_v, frs2_sb_raw_haz_v, frs3_sb_raw_haz_v;
+  logic frs1_sb_raw_haz_v2, frs2_sb_raw_haz_v2, frs3_sb_raw_haz_v2;
+
   logic frd_sb_waw_haz_v;
+  logic frd_sb_waw_haz_v2;
+
   logic [2:0] frs1_data_haz_v , frs2_data_haz_v, frs3_data_haz_v;
+  logic [2:0] frs1_data_haz_v2 , frs2_data_haz_v2, frs3_data_haz_v2;
+
   logic [2:0] rs1_match_vector, rs2_match_vector, rs3_match_vector;
+  logic [2:0] rs1_match_vector2, rs2_match_vector2, rs3_match_vector2;
+
 
   bp_be_dep_status_s [3:0] dep_status_r;
 
@@ -78,22 +93,38 @@ module bp_be_detector
   logic data_haz_v, control_haz_v, struct_haz_v;
   logic long_haz_v;
   logic mem_in_pipe_v;
-
+//score is determined by address
+//determined if commit is dcache miss then rd is the address we are waiting for
+//otherwise use the dispatch
+//FMA is fused multiply add; these are long and need to be saved for long term rd usage
   wire [reg_addr_width_gp-1:0] score_rd_li  = commit_pkt_cast_i.dcache_miss
     ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
     : dispatch_pkt_cast_i.instr.t.fmatype.rd_addr;
+  
+
+  wire [reg_addr_width_gp-1:0] score_rd_li2  = dispatch_pkt_cast_i.instr.t.fmatype.rd_addr;
+
+
   wire [reg_addr_width_gp-1:0] score_rs1_li = dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr;
   wire [reg_addr_width_gp-1:0] score_rs2_li = dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr;
   wire [reg_addr_width_gp-1:0] score_rs3_li = dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr;
+
+
+
+  //clear return reg using wb addr
   wire [reg_addr_width_gp-1:0] clear_ird_li = iwb_pkt_cast_i.rd_addr;
   wire [reg_addr_width_gp-1:0] clear_frd_li = fwb_pkt_cast_i.rd_addr;
 
+  //matching registers for inputs and writeback
   logic [1:0] irs_match_lo;
   logic       ird_match_lo;
+  //valid to score if dispatch is valid with late wb (div/mult) and wb or commit w/ dcache miss and will load or atomic mem op
   wire score_int_v_li = (dispatch_pkt_cast_i.v & dispatch_pkt_cast_i.decode.late_iwb_v)
     || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
+  //can clear if wb packet has valid wb
   wire clear_int_v_li = iwb_pkt_cast_i.ird_w_v & iwb_pkt_cast_i.late;
   bp_be_scoreboard
+  //update the scoreboard if we got a match
    #(.bp_params_p(bp_params_p), .num_rs_p(2))
    int_scoreboard
     (.clk_i(clk_i)
@@ -141,70 +172,135 @@ module bp_be_detector
       //   can be handled through forwarding
       for (integer i = 0; i < 3; i++)
         begin
+          //check if any 
           rs1_match_vector[i] = (isd_status_cast_i.rs1_addr == dep_status_r[i].rd_addr);
           rs2_match_vector[i] = (isd_status_cast_i.rs2_addr == dep_status_r[i].rd_addr);
           rs3_match_vector[i] = (isd_status_cast_i.rs3_addr == dep_status_r[i].rd_addr);
+
+          rs1_match_vector2[i] = (isd_status2_cast_i.rs1_addr == dep_status_r[i].rd_addr);
+          rs2_match_vector2[i] = (isd_status2_cast_i.rs2_addr == dep_status_r[i].rd_addr);
+          rs3_match_vector2[i] = (isd_status2_cast_i.rs3_addr == dep_status_r[i].rd_addr);
         end
 
       // Detect scoreboard hazards
+      //Raw hazards given they aren't being sent to 0 reg which is always 0
       irs1_sb_raw_haz_v = (isd_status_cast_i.irs1_v & irs_match_lo[0]) & (isd_status_cast_i.rs1_addr != '0);
       irs2_sb_raw_haz_v = (isd_status_cast_i.irs2_v & irs_match_lo[1]) & (isd_status_cast_i.rs2_addr != '0);
       ird_sb_waw_haz_v = (isd_status_cast_i.iwb_v & ird_match_lo) & (isd_status_cast_i.rd_addr != '0);
+
+      irs1_sb_raw_haz_v2 = (isd_status2_cast_i.irs1_v & irs_match_lo2[0]) & (isd_status2_cast_i.rs1_addr != '0);
+      irs2_sb_raw_haz_v2 = (isd_status2_cast_i.irs2_v & irs_match_lo2[1]) & (isd_status2_cast_i.rs2_addr != '0);
+      ird_sb_waw_haz_v2 = (isd_status2_cast_i.iwb_v & ird_match_lo2) & (isd_status2_cast_i.rd_addr != '0);
+
+////////////////////////////////////////////////////////////////////////////////////
 
       frs1_sb_raw_haz_v = (isd_status_cast_i.frs1_v & frs_match_lo[0]);
       frs2_sb_raw_haz_v = (isd_status_cast_i.frs2_v & frs_match_lo[1]);
       frs3_sb_raw_haz_v = (isd_status_cast_i.frs3_v & frs_match_lo[2]);
 
+      frs1_sb_raw_haz_v2 = (isd_status2_cast_i.frs1_v & frs_match_lo2[0]);
+      frs2_sb_raw_haz_v2 = (isd_status2_cast_i.frs2_v & frs_match_lo2[1]);
+      frs3_sb_raw_haz_v2 = (isd_status2_cast_i.frs3_v & frs_match_lo2[2]);
+
       frd_sb_waw_haz_v = (isd_status_cast_i.fwb_v & frd_match_lo);
+      frd_sb_waw_haz_v2 = (isd_status2_cast_i.fwb_v & frd_match_lo2);
+
 
       // Detect integer and float data hazards for EX1
       irs1_data_haz_v[0] = (isd_status_cast_i.irs1_v & rs1_match_vector[0])
                            & (isd_status_cast_i.rs1_addr != '0)
                            & (dep_status_r[0].aux_iwb_v | dep_status_r[0].mul_iwb_v | dep_status_r[0].emem_iwb_v | dep_status_r[0].fmem_iwb_v);
+      irs1_data_haz_v2[0] = (isd_status2_cast_i.irs1_v & rs1_match_vector2[0])
+                           & (isd_status2_cast_i.rs1_addr != '0)
+                           & (dep_status_r[0].aux_iwb_v | dep_status_r[0].mul_iwb_v | dep_status_r[0].emem_iwb_v | dep_status_r[0].fmem_iwb_v);
+
+
+
+
 
       irs2_data_haz_v[0] = (isd_status_cast_i.irs2_v & rs2_match_vector[0])
                            & (isd_status_cast_i.rs2_addr != '0)
                            & (dep_status_r[0].aux_iwb_v | dep_status_r[0].mul_iwb_v | dep_status_r[0].emem_iwb_v | dep_status_r[0].fmem_iwb_v);
+      irs2_data_haz_v2[0] = (isd_status2_cast_i.irs2_v & rs2_match_vector2[0])
+                           & (isd_status2_cast_i.rs2_addr != '0)
+                           & (dep_status_r[0].aux_iwb_v | dep_status_r[0].mul_iwb_v | dep_status_r[0].emem_iwb_v | dep_status_r[0].fmem_iwb_v);
+
+
 
       frs1_data_haz_v[0] = (isd_status_cast_i.frs1_v & rs1_match_vector[0])
                            & (dep_status_r[0].aux_fwb_v | dep_status_r[0].emem_fwb_v | dep_status_r[0].fmem_fwb_v | dep_status_r[0].fma_fwb_v);
+      frs1_data_haz_v2[0] = (isd_status2_cast_i.frs1_v & rs1_match_vector2[0])
+                           & (dep_status_r[0].aux_fwb_v | dep_status_r[0].emem_fwb_v | dep_status_r[0].fmem_fwb_v | dep_status_r[0].fma_fwb_v);
+
 
       frs2_data_haz_v[0] = (isd_status_cast_i.frs2_v & rs2_match_vector[0])
                            & (dep_status_r[0].aux_fwb_v | dep_status_r[0].emem_fwb_v | dep_status_r[0].fmem_fwb_v | dep_status_r[0].fma_fwb_v);
+      frs2_data_haz_v2[0] = (isd_status2_cast_i.frs2_v & rs2_match_vector2[0])
+                           & (dep_status_r[0].aux_fwb_v | dep_status_r[0].emem_fwb_v | dep_status_r[0].fmem_fwb_v | dep_status_r[0].fma_fwb_v);
+
 
       frs3_data_haz_v[0] = (isd_status_cast_i.frs3_v & rs3_match_vector[0])
+                           & (dep_status_r[0].aux_fwb_v | dep_status_r[0].emem_fwb_v | dep_status_r[0].fmem_fwb_v | dep_status_r[0].fma_fwb_v);
+      frs3_data_haz_v2[0] = (isd_status2_cast_i.frs3_v & rs3_match_vector2[0])
                            & (dep_status_r[0].aux_fwb_v | dep_status_r[0].emem_fwb_v | dep_status_r[0].fmem_fwb_v | dep_status_r[0].fma_fwb_v);
 
       // Detect integer and float data hazards for EX2
       irs1_data_haz_v[1] = (isd_status_cast_i.irs1_v & rs1_match_vector[1])
                            & (isd_status_cast_i.rs1_addr != '0)
                            & (dep_status_r[1].fmem_iwb_v | dep_status_r[1].mul_iwb_v);
+      irs1_data_haz_v2[1] = (isd_status2_cast_i.irs1_v & rs1_match_vector2[1])
+                           & (isd_status2_cast_i.rs1_addr != '0)
+                           & (dep_status_r[1].fmem_iwb_v | dep_status_r[1].mul_iwb_v);
 
-      irs2_data_haz_v[1] = (isd_status_cast_i.irs2_v & rs2_match_vector[1])
+
+      irs2_data_haz_v[1] = (isd_status_cast_i.irs2_v & rs2_match_vector2[1])
                            & (isd_status_cast_i.rs2_addr != '0)
                            & (dep_status_r[1].fmem_iwb_v | dep_status_r[1].mul_iwb_v);
+      irs2_data_haz_v2[1] = (isd_status2_cast_i.irs2_v & rs2_match_vector2[1])
+                           & (isd_status2_cast_i.rs2_addr != '0)
+                           & (dep_status_r[1].fmem_iwb_v | dep_status_r[1].mul_iwb_v);        
+
 
       frs1_data_haz_v[1] = (isd_status_cast_i.frs1_v & rs1_match_vector[1])
                            & (dep_status_r[1].fmem_fwb_v | dep_status_r[1].fma_fwb_v);
+      frs1_data_haz_v2[1] = (isd_status2_cast_i.frs1_v & rs1_match_vector2[1])
+                           & (dep_status_r[1].fmem_fwb_v | dep_status_r[1].fma_fwb_v);
+
 
       frs2_data_haz_v[1] = (isd_status_cast_i.frs2_v & rs2_match_vector[1])
                            & (dep_status_r[1].fmem_fwb_v | dep_status_r[1].fma_fwb_v);
+      frs2_data_haz_v2[1] = (isd_status2_cast_i.frs2_v & rs2_match_vector2[1])
+                           & (dep_status_r[1].fmem_fwb_v | dep_status_r[1].fma_fwb_v);
+
 
       frs3_data_haz_v[1] = (isd_status_cast_i.frs3_v & rs3_match_vector[1])
                            & (dep_status_r[1].fmem_fwb_v | dep_status_r[1].fma_fwb_v);
+      frs3_data_haz_v2[1] = (isd_status2_cast_i.frs3_v & rs3_match_vector2[1])
+                           & (dep_status_r[1].fmem_fwb_v | dep_status_r[1].fma_fwb_v);
 
       irs1_data_haz_v[2] = '0;
+      irs1_data_haz_v2[2] = '0;
 
       irs2_data_haz_v[2] = '0;
+      irs2_data_haz_v2[2] = '0;      
 
       frs1_data_haz_v[2] = (isd_status_cast_i.frs1_v & rs1_match_vector[2])
                            & (dep_status_r[2].fma_fwb_v);
+      frs1_data_haz_v2[2] = (isd_status2_cast_i.frs1_v & rs1_match_vector2[2])
+                           & (dep_status_r[2].fma_fwb_v);
+
 
       frs2_data_haz_v[2] = (isd_status_cast_i.frs2_v & rs2_match_vector[2])
                            & (dep_status_r[2].fma_fwb_v);
+      frs2_data_haz_v2[2] = (isd_status2_cast_i.frs2_v & rs2_match_vector2[2])
+                           & (dep_status_r[2].fma_fwb_v);
+
 
       frs3_data_haz_v[2] = (isd_status_cast_i.frs3_v & rs3_match_vector[2])
                            & (dep_status_r[2].fma_fwb_v);
+      frs3_data_haz_v2[2] = (isd_status2_cast_i.frs3_v & rs3_match_vector2[2])
+                           & (dep_status_r[2].fma_fwb_v);
+
 
       mem_in_pipe_v      = dep_status_r[0].mem_v | dep_status_r[1].mem_v | dep_status_r[2].mem_v;
       fence_haz_v        = (isd_status_cast_i.fence_v & (~credits_empty_i | mem_in_pipe_v | ~mem_ready_i))
@@ -224,17 +320,22 @@ module bp_be_detector
       //   executing instructions on trap, and only pause on dependency in
       //   EX4, rather than any instruction. Most likely not a huge
       //   performance problem at the moment.
-      long_haz_v = isd_status_cast_i.long_v
+      long_haz_v = (isd_status_cast_i.long_v
                    & ((dep_status_r[0].instr_v)
                       | (dep_status_r[1].instr_v)
                       | (dep_status_r[2].instr_v)
-                      );
+                   )) 
+                   || (isd_status2_cast_i.long_v
+                   & ((dep_status_r[0].instr_v)
+                      | (dep_status_r[1].instr_v)
+                      | (dep_status_r[2].instr_v)
+                   ));
 
-      csr_haz_v     = isd_status_cast_i.csr_v
+      csr_haz_v     = (isd_status_cast_i.csr_v
                       & ((dep_status_r[0].instr_v)
                          | (dep_status_r[1].instr_v)
                          | (dep_status_r[2].instr_v)
-                         );
+                         ));
 
       control_haz_v = fence_haz_v | csr_haz_v | fflags_haz_v | long_haz_v;
 
@@ -263,6 +364,7 @@ module bp_be_detector
   bp_be_dep_status_s dep_status_n;
   always_comb
     begin
+      //label all dependencies of the dispatch packet
       dep_status_n.instr_v    = dispatch_pkt_cast_i.v;
       dep_status_n.mem_v      = dispatch_pkt_cast_i.decode.mem_v;
       dep_status_n.csr_v      = (dispatch_pkt_cast_i.decode.csr_w_v | dispatch_pkt_cast_i.decode.csr_r_v);
