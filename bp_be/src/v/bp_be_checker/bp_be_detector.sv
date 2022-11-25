@@ -13,8 +13,9 @@
  * Modifications: 
  *   1. doubled outputs: dispatch_v_o
  *   2. doubled inputs: isd_status_i
- *   3. Calculator's bandwidth to be decided ()
- *   4. cmd_full_i, credits_full_i, credits_empty_i to be decided
+ *   3. dispatch_pkt doubled
+ *   4. dependency between instr issued in same cycle not solved yet
+ *   5. cmd_full_i, credits_full_i, credits_empty_i to be decided
  *
  */
 
