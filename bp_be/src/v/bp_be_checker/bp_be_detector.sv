@@ -59,7 +59,7 @@ module bp_be_detector
    , output logic                      dispatch_v1_o, dispatch_v2_o
    , output logic                      interrupt_v_o // interrupt_v_o = irq_pending_i & ~ptw_busy_i;
       // from scheduler
-   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i// used to extract source reg info
+   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt1_i, dispatch_pkt2_i// used to extract source reg info
       // from calculator
    , input [commit_pkt_width_lp-1:0]   commit_pkt_i // used to extract dest. reg info
    , input [wb_pkt_width_lp-1:0]       iwb_pkt_i
@@ -72,7 +72,8 @@ module bp_be_detector
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
   `bp_cast_i(bp_be_isd_status_s, isd_status1);
   `bp_cast_i(bp_be_isd_status_s, isd_status2);
-  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt1);
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2);
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt);
@@ -100,20 +101,36 @@ module bp_be_detector
   logic data_haz2_v, control_haz2_v, struct_haz2_v;
   logic long_haz1_v, long_haz2_v;
   logic mem_in_pipe_v;
-
-  wire [reg_addr_width_gp-1:0] score_rd_li  = commit_pkt_cast_i.dcache_miss
+  
+  // doubled
+  wire [reg_addr_width_gp-1:0] score1_rd_li  = commit_pkt_cast_i.dcache_miss
     ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
-    : dispatch_pkt_cast_i.instr.t.fmatype.rd_addr;
-  wire [reg_addr_width_gp-1:0] score_rs1_li = dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr;
-  wire [reg_addr_width_gp-1:0] score_rs2_li = dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr;
-  wire [reg_addr_width_gp-1:0] score_rs3_li = dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr;
+    : dispatch_pkt1_cast_i.instr.t.fmatype.rd_addr;
+  wire [reg_addr_width_gp-1:0] score1_rs1_li = dispatch_pkt1_cast_i.instr.t.fmatype.rs1_addr;
+  wire [reg_addr_width_gp-1:0] score1_rs2_li = dispatch_pkt1_cast_i.instr.t.fmatype.rs2_addr;
+  wire [reg_addr_width_gp-1:0] score1_rs3_li = dispatch_pkt1_cast_i.instr.t.fmatype.rs3_addr;
   wire [reg_addr_width_gp-1:0] clear_ird_li = iwb_pkt_cast_i.rd_addr;
   wire [reg_addr_width_gp-1:0] clear_frd_li = fwb_pkt_cast_i.rd_addr;
 
-  logic [1:0] irs_match_lo;
-  logic       ird_match_lo;
-  wire score_int_v_li = (dispatch_pkt_cast_i.v & dispatch_pkt_cast_i.decode.late_iwb_v)
+  wire [reg_addr_width_gp-1:0] score2_rd_li  = commit_pkt_cast_i.dcache_miss
+    ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
+    : dispatch_pkt2_cast_i.instr.t.fmatype.rd_addr;
+  wire [reg_addr_width_gp-1:0] score2_rs1_li = dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr;
+  wire [reg_addr_width_gp-1:0] score2_rs2_li = dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr;
+  wire [reg_addr_width_gp-1:0] score2_rs3_li = dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr;
+  //wire [reg_addr_width_gp-1:0] clear_ird_li = iwb_pkt_cast_i.rd_addr;
+  //wire [reg_addr_width_gp-1:0] clear_frd_li = fwb_pkt_cast_i.rd_addr;
+
+  // doubled
+  logic [1:0] irs_match1_lo, irs_match2_lo;
+  logic       ird_match1_lo, irs_match2_lo;
+  
+  //doubled
+  wire score1_int_v_li = (dispatch_pkt1_cast_i.v & dispatch_pkt1_cast_i.decode.late_iwb_v)
     || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
+  wire score2_int_v_li = (dispatch_pkt2_cast_i.v & dispatch_pkt2_cast_i.decode.late_iwb_v)
+    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
+  
   wire clear_int_v_li = iwb_pkt_cast_i.ird_w_v & iwb_pkt_cast_i.late;
   
   // integer scoreboard
@@ -135,11 +152,17 @@ module bp_be_detector
      ,.rd_match_o(ird_match_lo)
      );
 
-  logic [2:0] frs_match_lo;
-  logic       frd_match_lo;
-  wire score_fp_v_li = (dispatch_pkt_cast_i.v & dispatch_pkt_cast_i.decode.late_fwb_v)
+  logic [2:0] frs_match1_lo, frs_match2_lo;
+  logic       frd_match1_lo, frd_match2_lo;
+  
+  //doubled
+  wire score1_fp_v_li = (dispatch_pkt1_cast_i.v & dispatch_pkt1_cast_i.decode.late_fwb_v)
     || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode == `RV64_FLOAD_OP);
+  wire score2_fp_v_li = (dispatch_pkt2_cast_i.v & dispatch_pkt2_cast_i.decode.late_fwb_v)
+    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode == `RV64_FLOAD_OP);
+  
   wire clear_fp_v_li = fwb_pkt_cast_i.frd_w_v & fwb_pkt_cast_i.late;
+
   //Float point scoreboard
   bp_be_scoreboard
    #(.bp_params_p(bp_params_p), .num_rs_p(3))
@@ -382,27 +405,28 @@ module bp_be_detector
   bp_be_dep_status_s dep_status_n;
   always_comb
     begin
-      dep_status_n.instr_v    = dispatch_pkt_cast_i.v;
-      dep_status_n.mem_v      = dispatch_pkt_cast_i.decode.mem_v;
-      dep_status_n.csr_v      = (dispatch_pkt_cast_i.decode.csr_w_v | dispatch_pkt_cast_i.decode.csr_r_v);
-      dep_status_n.fflags_w_v = dispatch_pkt_cast_i.decode.fflags_w_v;
-      dep_status_n.ctl_iwb_v  = dispatch_pkt_cast_i.decode.pipe_ctl_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.int_iwb_v  = dispatch_pkt_cast_i.decode.pipe_int_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.int_fwb_v  = dispatch_pkt_cast_i.decode.pipe_int_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.aux_iwb_v  = dispatch_pkt_cast_i.decode.pipe_aux_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.aux_fwb_v  = dispatch_pkt_cast_i.decode.pipe_aux_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.emem_iwb_v = dispatch_pkt_cast_i.decode.pipe_mem_early_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.emem_fwb_v = dispatch_pkt_cast_i.decode.pipe_mem_early_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.fmem_iwb_v = dispatch_pkt_cast_i.decode.pipe_mem_final_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.fmem_fwb_v = dispatch_pkt_cast_i.decode.pipe_mem_final_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.mul_iwb_v  = dispatch_pkt_cast_i.decode.pipe_mul_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.fma_fwb_v  = dispatch_pkt_cast_i.decode.pipe_fma_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.rd_addr    = dispatch_pkt_cast_i.instr.t.rtype.rd_addr;
+      dep_status_n.instr_v    = (dispatch_pkt1_cast_i.v | dispatch_pkt2_cast_i.v);
+      dep_status_n.mem_v      = (dispatch_pkt1_cast_i.decode.mem_v | dispatch_pkt2_cast_i.decode.mem_v);
+      dep_status_n.csr_v      =  (dispatch_pkt1_cast_i.decode.csr_w_v | dispatch_pkt1_cast_i.decode.csr_r_v) | (dispatch_pkt2_cast_i.decode.csr_w_v | dispatch_pkt2_cast_i.decode.csr_r_v);
+      dep_status_n.fflags_w_v = (dispatch_pkt1_cast_i.decode.fflags_w_v | dispatch_pkt2_cast_i.decode.fflags_w_v);
+      dep_status_n.ctl_iwb_v  = (dispatch_pkt1_cast_i.decode.pipe_ctl_v & dispatch_pkt1_cast_i.decode.irf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_ctl_v & 
+dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.int_iwb_v  = (dispatch_pkt1_cast_i.decode.pipe_int_v & dispatch_pkt1_cast_i.decode.irf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_int_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.int_fwb_v  = (dispatch_pkt1_cast_i.decode.pipe_int_v & dispatch_pkt1_cast_i.decode.frf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_int_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.aux_iwb_v  = (dispatch_pkt1_cast_i.decode.pipe_aux_v & dispatch_pkt1_cast_i.decode.irf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_aux_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.aux_fwb_v  = (dispatch_pkt1_cast_i.decode.pipe_aux_v & dispatch_pkt1_cast_i.decode.frf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_aux_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.emem_iwb_v = (dispatch_pkt1_cast_i.decode.pipe_mem_early_v & dispatch_pkt1_cast_i.decode.irf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_mem_early_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.emem_fwb_v = (dispatch_pkt1_cast_i.decode.pipe_mem_early_v & dispatch_pkt1_cast_i.decode.frf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_mem_early_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.fmem_iwb_v = (dispatch_pkt1_cast_i.decode.pipe_mem_final_v & dispatch_pkt1_cast_i.decode.irf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_mem_final_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.fmem_fwb_v = (dispatch_pkt1_cast_i.decode.pipe_mem_final_v & dispatch_pkt1_cast_i.decode.frf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_mem_final_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.mul_iwb_v  = (dispatch_pkt1_cast_i.decode.pipe_mul_v & dispatch_pkt1_cast_i.decode.irf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_mul_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.fma_fwb_v  = (dispatch_pkt1_cast_i.decode.pipe_fma_v & dispatch_pkt1_cast_i.decode.frf_w_v) | (dispatch_pkt2_cast_i.decode.pipe_fma_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.rd_addr    = dispatch_pkt1_cast_i.instr.t.rtype.rd_addr | dispatch_pkt2_cast_i.instr.t.rtype.rd_addr;
     end
 
   always_ff @(posedge clk_i)
     begin
-      dep_status_r[0]   <= dispatch_pkt_cast_i.v ? dep_status_n : '0;
+      dep_status_r[0]   <= (dispatch_pkt1_cast_i.v | dispatch_pkt2_cast_i.v) ? dep_status_n : '0;
       dep_status_r[3:1] <= dep_status_r[2:0];
     end
 

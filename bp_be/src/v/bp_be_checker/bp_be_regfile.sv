@@ -14,7 +14,9 @@
  *       down to if writing / reading x0 and then muxing is less power than checking x == 0 on input.
  *
  * Modifications:
- *   1. doubled inputs: 
+ *   1. doubled inputs: rs_r_v_i, rs_addr_i width doubled
+ *   2. doubled outputs: rs_data_o
+ *   3. assumption: only 1 wb_pkt
  */
 
 `include "bp_common_defines.svh"
@@ -32,10 +34,10 @@ module bp_be_regfile
   (input                                            clk_i
    , input                                          reset_i
 
-   // rs read bus
-   , input [read_ports_p-1:0]                       rs_r_v_i
-   , input [read_ports_p-1:0][reg_addr_width_gp-1:0] rs_addr_i
-   , output [read_ports_p-1:0][data_width_p-1:0]    rs_data_o
+   // rs read bus *2 for all
+   , input [2*read_ports_p-1:0]                       rs_r_v_i
+   , input [2*read_ports_p-1:0][reg_addr_width_gp-1:0] rs_addr_i
+   , output [2*read_ports_p-1:0][data_width_p-1:0]    rs_data_o
 
    // rd write bus
    , input                                          rd_w_v_i
@@ -44,11 +46,12 @@ module bp_be_regfile
    );
 
   localparam rf_els_lp = 2**reg_addr_width_gp;
-  logic [read_ports_p-1:0] rs_v_li;
-  logic [read_ports_p-1:0][reg_addr_width_gp-1:0] rs_addr_li;
-  logic [read_ports_p-1:0][data_width_p-1:0] rs_data_lo;
+  logic [2*read_ports_p-1:0] rs_v_li;
+  logic [2*read_ports_p-1:0][reg_addr_width_gp-1:0] rs_addr_li;
+  logic [2*read_ports_p-1:0][data_width_p-1:0] rs_data_lo;
   if (read_ports_p == 2)
     begin : tworonew
+      /*
       bsg_mem_2r1w_sync
        #(.width_p(data_width_p), .els_p(rf_els_lp))
        rf
@@ -67,9 +70,27 @@ module bp_be_regfile
          ,.r1_addr_i(rs_addr_li[1])
          ,.r1_data_o(rs_data_lo[1])
          );
+      */
+
+      bsg_mem_multiport
+       #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(1))
+       rf
+       (.clk_i(clk_i)
+         ,.reset_i(reset_i)
+
+         ,.w_v_i(rd_w_v_i)
+         ,.w_addr_i(rd_addr_i)
+         ,.w_data_i(rd_data_i)
+
+         ,.r_v_i(rs_v_li)
+         ,.r_addr_i(rs_addr_li)
+         ,.r_data_o(rs_data_lo)
+       );
+
     end
   else if (read_ports_p == 3)
     begin : threeronew
+      /*
       bsg_mem_3r1w_sync
        #(.width_p(data_width_p), .els_p(rf_els_lp))
        rf
@@ -92,6 +113,22 @@ module bp_be_regfile
          ,.r2_addr_i(rs_addr_li[2])
          ,.r2_data_o(rs_data_lo[2])
          );
+      */
+
+      bsg_mem_multiport
+       #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(1))
+       rf
+       (.clk_i(clk_i)
+         ,.reset_i(reset_i)
+
+         ,.w_v_i(rd_w_v_i)
+         ,.w_addr_i(rd_addr_i)
+         ,.w_data_i(rd_data_i)
+
+         ,.r_v_i(rs_v_li)
+         ,.r_addr_i(rs_addr_li)
+         ,.r_data_o(rs_data_lo)
+       );
     end
   else
     begin : error
@@ -108,12 +145,13 @@ module bp_be_regfile
      ,.data_o(rd_data_r)
      );
 
-  for (genvar i = 0; i < read_ports_p; i++)
+  for (genvar i = 0; i < 2*read_ports_p; i++)
     begin : bypass
       logic zero_rs_r, fwd_rs_r, rs_r_v_r;
       logic [data_width_p-1:0] fwd_data_lo;
       wire zero_rs = rs_r_v_i[i] & (rs_addr_i[i] == '0) & (zero_x0_p == 1);
       wire fwd_rs = rd_w_v_i & rs_r_v_i[i] & (rd_addr_i == rs_addr_i[i]);
+      
       bsg_dff
        #(.width_p(3))
        rs_r_v_reg
