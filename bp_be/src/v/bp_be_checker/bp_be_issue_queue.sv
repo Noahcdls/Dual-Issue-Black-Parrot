@@ -1,8 +1,8 @@
 /* 
  * Modifications: 
- *   1. doubled inputs: fe_queue_i, fe_queue_v_i
- *   2. doubled outputs: fe_queue_o, fe_queue_v_o, fe_queue_ready_i, preissue_pkt_o, issue_pkt_o
- *   3. To be determined ports: fe_queue_yumi_i, clr_v_i
+ *   1. doubled inputs: fe_queue_i, fe_queue_v_i, fe_queue_yumi_i
+ *   2. doubled outputs: fe_queue_o, fe_queue_v_o, preissue_pkt_o, issue_pkt_o
+ *   3. To be determined ports:  clr_v_i
  *   4. Changed module: reg_fifo_mem -> 2r2w
  *   5. Checkpoint ptr jmp step doubled
  *   6. instr type conflict should be solved in calculator
@@ -34,7 +34,7 @@ module bp_be_issue_queue
 
    , output logic [fe_queue_width_lp-1:0]   fe_queue1_o, fe_queue2_o
    , output logic                           fe_queue_v_o
-   , input                                  fe_queue_yumi_i
+   , input                                  fe_queue_yumi1_i, fe_queue_yumi2_i
 
    , output logic [issue_pkt_width_lp-1:0]  preissue_pkt1_o, preissue_pkt2_o
    , output logic [issue_pkt_width_lp-1:0]  issue_pkt1_o, issue_pkt2_o
@@ -67,7 +67,7 @@ module bp_be_issue_queue
   wire enq2  = fe_queue_ready_o & fe_queue_v2_i;
 
   wire deq  = deq_v_i; // = commit_pkt_cast_i.queue_v;
-  wire read = fe_queue_yumi_i;
+  wire read = fe_queue_yumi1_i & fe_queue_yumi2_i;
   wire clr  = clr_v_i; // = suppress_iss_i = (state_r != e_run)
   wire roll = roll_v_i; // = commit_pkt_cast_i.npc_w_v;
 
@@ -181,8 +181,8 @@ module bp_be_issue_queue
   assign instr2 = fe_queue2_cast_i.msg.fetch.instr;
 
   bp_be_issue_pkt_s issue_pkt1_li, issue_pkt1_lo, issue_pkt2_li, issue_pkt2_lo;
-  wire issue_v1 = (fe_queue_yumi_i & ~empty_n) | roll_v_i | (fe_queue_v1_i & empty);
-  wire issue_v2 = (fe_queue_yumi_i & ~empty_n) | roll_v_i | (fe_queue_v2_i & empty);
+  wire issue_v1 = (fe_queue_yumi1_i & ~empty_n) | roll_v_i | (fe_queue_v1_i & empty);
+  wire issue_v2 = (fe_queue_yumi2_i & ~empty_n) | roll_v_i | (fe_queue_v2_i & empty);
   wire bypass_reg1 = (wptr1_r == rptr1_n);
   wire bypass_reg2 = (wptr2_r == rptr2_n);
   

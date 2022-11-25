@@ -89,7 +89,8 @@ module bp_be_scheduler
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
 
   bp_fe_queue_s fe_queue1_lo, fe_queue2_lo; //doubled
-  logic fe_queue_v_lo, fe_queue_yumi_li; // no need to be doubled for now
+  logic fe_queue_yumi1_li, fe_queue_yumi2_li; // doubled
+  logic fe_queue_v_lo; // no need to be doubled for now
   wire fe_queue_clr_li  = suppress_iss_i; // no need to be doubled for now
   wire fe_queue_deq_li  = commit_pkt_cast_i.queue_v;
   wire fe_queue_roll_li = commit_pkt_cast_i.npc_w_v;
@@ -116,7 +117,8 @@ module bp_be_scheduler
      ,.fe_queue1_o(fe_queue1_lo)
      ,.fe_queue2_o(fe_queue2_lo)
      ,.fe_queue_v_o(fe_queue_v_lo)
-     ,.fe_queue_yumi_i(fe_queue_yumi_li)
+     ,.fe_queue_yumi1_i(fe_queue_yumi1_li)
+     ,.fe_queue_yumi2_i(fe_queue_yumi2_li)
 
      ,.preissue_pkt1_o(preissue_pkt1)
      ,.preissue_pkt2_o(preissue_pkt2)
@@ -207,8 +209,8 @@ module bp_be_scheduler
      ,.sfence_vma2_o(sfence_vma2_lo)
      );
   //doubled
-  wire fe_exc_not_instr1_li = fe_queue_yumi_li & (fe_queue1_lo.msg_type == e_fe_exception);
-  wire fe_exc_not_instr2_li = fe_queue_yumi_li & (fe_queue2_lo.msg_type == e_fe_exception);
+  wire fe_exc_not_instr1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == e_fe_exception);
+  wire fe_exc_not_instr2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == e_fe_exception);
 
   //doubled
   wire [vaddr_width_p-1:0] fe_exc_vaddr1_li = fe_queue1_lo.msg.exception.vaddr;
@@ -220,11 +222,12 @@ module bp_be_scheduler
   wire [dpath_width_gp-1:0] be_exc_data_li = ptw_fill_pkt_cast_i.entry;
   
   //doubled
-  wire fe_instr_not_exc1_li = fe_queue_yumi_li & (fe_queue1_lo.msg_type == e_fe_fetch);
-  wire fe_instr_not_exc2_li = fe_queue_yumi_li & (fe_queue2_lo.msg_type == e_fe_fetch);
+  wire fe_instr_not_exc1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == e_fe_fetch);
+  wire fe_instr_not_exc2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == e_fe_fetch);
   
   // no need to be doubled for now
-  assign fe_queue_yumi_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v1_i & dispatch_v2_i & ~be_exc_not_instr_li;
+  assign fe_queue_yumi1_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v1_i & ~be_exc_not_instr_li;
+  assign fe_queue_yumi2_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v2_i & ~be_exc_not_instr_li;
   
 
   bp_be_dispatch_pkt_s dispatch_pkt1, dispatch_pkt2;// doubled
@@ -233,7 +236,7 @@ module bp_be_scheduler
     begin
       // Calculator status ISD stage (doubled)
       isd_status1_cast_o = '0;
-      isd_status1_cast_o.v        = fe_queue_yumi_li;
+      isd_status1_cast_o.v        = fe_queue_yumi1_li;
       isd_status1_cast_o.pc       = fe_queue1_lo.msg.fetch.pc;
       isd_status1_cast_o.branch_metadata_fwd = fe_queue1_lo.msg.fetch.branch_metadata_fwd;
       isd_status1_cast_o.fence_v  = fe_queue_v_lo & issue_pkt1.fence_v;
@@ -253,7 +256,7 @@ module bp_be_scheduler
       isd_status1_cast_o.fwb_v    = instr_decoded1.frf_w_v;
 
       isd_status2_cast_o = '0;
-      isd_status2_cast_o.v        = fe_queue_yumi_li;
+      isd_status2_cast_o.v        = fe_queue_yumi2_li;
       isd_status2_cast_o.pc       = fe_queue2_lo.msg.fetch.pc;
       isd_status2_cast_o.branch_metadata_fwd = fe_queue2_lo.msg.fetch.branch_metadata_fwd;
       isd_status2_cast_o.fence_v  = fe_queue_v_lo & issue_pkt2.fence_v;
@@ -274,14 +277,14 @@ module bp_be_scheduler
 
       // Form dispatch packet (doubled)
       dispatch_pkt1 = '0;
-      dispatch_pkt1.v        = (fe_queue_yumi_li & ~poison_isd_i) || be_exc_not_instr_li;
-      dispatch_pkt1.queue_v  = fe_queue_yumi_li;
+      dispatch_pkt1.v        = (fe_queue_yumi1_li & ~poison_isd_i) || be_exc_not_instr_li;
+      dispatch_pkt1.queue_v  = fe_queue_yumi1_li;
       dispatch_pkt1.pc       = expected_npc_i;
       dispatch_pkt1.instr    = fe_queue1_lo.msg.fetch.instr;
 
       dispatch_pkt2 = '0;
-      dispatch_pkt2.v        = (fe_queue_yumi_li & ~poison_isd_i) || be_exc_not_instr_li;
-      dispatch_pkt2.queue_v  = fe_queue_yumi_li;
+      dispatch_pkt2.v        = (fe_queue_yumi2_li & ~poison_isd_i) || be_exc_not_instr_li;
+      dispatch_pkt2.queue_v  = fe_queue_yumi2_li;
       dispatch_pkt2.pc       = expected_npc_i;
       dispatch_pkt2.instr    = fe_queue2_lo.msg.fetch.instr;
       
