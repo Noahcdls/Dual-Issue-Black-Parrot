@@ -26,8 +26,8 @@ module bp_be_top
    , input [cfg_bus_width_lp-1:0]                    cfg_bus_i
 
    // FE queue interface
-   , input [fe_queue_width_lp-1:0]                   fe_queue_i
-   , input                                           fe_queue_v_i
+   , input [fe_queue_width_lp-1:0]                   fe_queue1_i, fe_queue2_i
+   , input                                           fe_queue_v1_i, fe_queue_v2_i
    , output                                          fe_queue_ready_o
 
    // FE cmd interface
@@ -79,10 +79,10 @@ module bp_be_top
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
   // Top-level interface connections
-  bp_be_dispatch_pkt_s dispatch_pkt;
+  bp_be_dispatch_pkt_s dispatch_pkt1, dispatch_pkt2;
   bp_be_branch_pkt_s   br_pkt;
 
-  logic dispatch_v, interrupt_v;
+  logic dispatch_v1, dispatch_v2, interrupt_v;
   logic irq_pending_lo, irq_waiting_lo;
 
   bp_be_commit_pkt_s commit_pkt;
@@ -90,7 +90,7 @@ module bp_be_top
   bp_be_wb_pkt_s iwb_pkt, fwb_pkt;
   bp_be_decode_info_s decode_info_lo;
 
-  bp_be_isd_status_s isd_status;
+  bp_be_isd_status_s isd_status1, isd_status2;
   logic [vaddr_width_p-1:0] expected_npc_lo;
   logic poison_isd_lo, suppress_iss_lo, unfreeze_lo;
 
@@ -105,7 +105,8 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status_i(isd_status) // from scheduler
+     ,.isd_status1_i(isd_status1)
+     ,.isd_status2_i(isd_status2) // from scheduler
      ,.expected_npc_o(expected_npc_lo) // to scheduler
 
      ,.fe_cmd_o(fe_cmd_o) // BE output
@@ -133,7 +134,8 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status_i(isd_status) // from scheduler
+     ,.isd_status1_i(isd_status1)
+     ,.isd_status2_i(isd_status2) // from scheduler
      ,.cmd_full_i(cmd_full_r_lo) // from director
      ,.credits_full_i(cache_req_credits_full_i) // BE input
      ,.credits_empty_i(cache_req_credits_empty_i) // BE input
@@ -143,9 +145,11 @@ module bp_be_top
      ,.ptw_busy_i(ptw_busy_lo) // from calculator
      ,.irq_pending_i(irq_pending_lo)  // from calculator
 
-     ,.dispatch_v_o(dispatch_v) // to scheduler
+     ,.dispatch_v1_o(dispatch_v1)
+     ,.dispatch_v2_o(dispatch_v2) // to scheduler
      ,.interrupt_v_o(interrupt_v) // to scheduler
-     ,.dispatch_pkt_i(dispatch_pkt) // from scheduler
+     ,.dispatch_pkt1_i(dispatch_pkt1)
+     ,.dispatch_pkt2_i(dispatch_pkt2) // from scheduler
      ,.commit_pkt_i(commit_pkt) // from calculator
      ,.iwb_pkt_i(iwb_pkt) // from calculator
      ,.fwb_pkt_i(fwb_pkt) // from calculator
@@ -158,20 +162,26 @@ module bp_be_top
      ,.reset_i(reset_i)
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status_o(isd_status) // to detector & director
+     ,.isd_status1_o(isd_status1)
+     ,.isd_status2_o(isd_status2) // to detector & director
      ,.expected_npc_i(expected_npc_lo) // from director
      ,.poison_isd_i(poison_isd_lo) // from director
-     ,.dispatch_v_i(dispatch_v) // from detector
+     ,.dispatch_v1_i(dispatch_v1)
+     ,.dispatch_v2_i(dispatch_v2) // from detector
      ,.interrupt_v_i(interrupt_v) // from detector
      ,.unfreeze_i(unfreeze_lo) // from director
      ,.suppress_iss_i(suppress_iss_lo) // from director
      ,.decode_info_i(decode_info_lo) // from calculator
 
-     ,.fe_queue_i(fe_queue_i) //BE input
-     ,.fe_queue_v_i(fe_queue_v_i) //BE input
+     ,.fe_queue1_i(fe_queue1_i) //BE input
+     ,.fe_queue_v1_i(fe_queue_v1_i) //BE input
+     ,.fe_queue2_i(fe_queue2_i) //BE input
+     ,.fe_queue_v2_i(fe_queue_v2_i) //BE input
      ,.fe_queue_ready_o(fe_queue_ready_o) //BE output
 
-     ,.dispatch_pkt_o(dispatch_pkt) // to detector & calculator
+
+     ,.dispatch_pkt1_o(dispatch_pkt1)
+     ,.dispatch_pkt2_o(dispatch_pkt2) // to detector & calculator
 
      ,.commit_pkt_i(commit_pkt) // from calculator
      ,.ptw_fill_pkt_i(ptw_fill_pkt) // from calculator

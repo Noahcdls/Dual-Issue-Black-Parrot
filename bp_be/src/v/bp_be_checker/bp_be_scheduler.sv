@@ -12,7 +12,7 @@
  *
  * Modifications: 
  *   1. doubled outputs: isd_status_o, dispatch_pkt_o
- *   2. doubled inputs: dispatch_v_i
+ *   2. doubled inputs: dispatch_v_i, fe_queue_i, fe_queue_v_i
  *   3. Fetch Interfaces doubled (fe_queue_i, fe_queue_v_i) to match Front End modifications
  *   4. doubled internal ports: preissue_pkt, issue_pkt
  *   5. Calculator's bandwidth to be decided 
