@@ -60,7 +60,7 @@ module bp_be_detector
    , output logic                      interrupt_v_o // interrupt_v_o = irq_pending_i & ~ptw_busy_i;
       // from scheduler
       // DOUBLE DISPATCH PACKETS - NOAH
-   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i// used to extract source reg info
+   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i, dispatch_pkt2_i// used to extract source reg info
       // from calculator
    , input [commit_pkt_width_lp-1:0]   commit_pkt_i // used to extract dest. reg info
    , input [wb_pkt_width_lp-1:0]       iwb_pkt_i
@@ -74,6 +74,7 @@ module bp_be_detector
   `bp_cast_i(bp_be_isd_status_s, isd_status1);
   `bp_cast_i(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2);
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt);
@@ -105,15 +106,30 @@ module bp_be_detector
   wire [reg_addr_width_gp-1:0] score_rd_li  = commit_pkt_cast_i.dcache_miss
     ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
     : dispatch_pkt_cast_i.instr.t.fmatype.rd_addr;
+  wire [reg_addr_width_gp-1:0] score_rd_li2  = commit_pkt_cast_i.dcache_miss
+    ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
+    : dispatch_pkt2_cast_i.instr.t.fmatype.rd_addr;
+
   wire [reg_addr_width_gp-1:0] score_rs1_li = dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr;
   wire [reg_addr_width_gp-1:0] score_rs2_li = dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr;
   wire [reg_addr_width_gp-1:0] score_rs3_li = dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr;
+
+  wire [reg_addr_width_gp-1:0] score_rs1_li2 = dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr;
+  wire [reg_addr_width_gp-1:0] score_rs2_li2 = dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr;
+  wire [reg_addr_width_gp-1:0] score_rs3_li2 = dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr;
+
   wire [reg_addr_width_gp-1:0] clear_ird_li = iwb_pkt_cast_i.rd_addr;
   wire [reg_addr_width_gp-1:0] clear_frd_li = fwb_pkt_cast_i.rd_addr;
 
-  logic [1:0] irs_match_lo;
-  logic       ird_match_lo;
+  logic [1:0] irs_match_lo, irs_match_lo2;
+  logic       ird_match_lo, ird_match_lo2;
+
+  //late wb will occur due to a mult or div which takes mult cycles hence late wb
+  //should add for both dispatches as at least one of these will use the multiply
+  //so long as data dependenciesa are not an issue
   wire score_int_v_li = (dispatch_pkt_cast_i.v & dispatch_pkt_cast_i.decode.late_iwb_v)
+    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
+  wire score_int_v_li2 = (dispatch_pkt2_cast_i.v & dispatch_pkt2_cast_i.decode.late_iwb_v)
     || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
   wire clear_int_v_li = iwb_pkt_cast_i.ird_w_v & iwb_pkt_cast_i.late;
   
@@ -121,47 +137,54 @@ module bp_be_detector
   // I tried making an updated scoreboard so that may be helpful with dependencies btwn instr - Noah 
   //also maybe figure out how to add other dispatch into score board
   // FMA also stands for fused multiply add - a*b+c so scoreboards add also for long instr
-  bp_be_scoreboard
+
+  bp_be_scoreboard_di
    #(.bp_params_p(bp_params_p), .num_rs_p(2))
-   int_scoreboard
-    (.clk_i(clk_i)
-     ,.reset_i(reset_i)
+   int_scoreboard_di
+  (.clk_i(clk_i)
+   ,.reset_i(reset_i)
 
-     ,.score_v_i(score_int_v_li)
-     ,.score_rd_i(score_rd_li)
+   ,.score_v_i(score_int_v_li), .score_v_i2(score_int_v_li2)
+   ,.score_rd_i(score_rd_li), .score_rd_i2(score_rd_li2)
 
-     ,.clear_v_i(clear_int_v_li)
-     ,.clear_rd_i(clear_ird_li)
+   ,.clear_v_i(clear_int_v_li)
+   ,.clear_rd_i(clear_ird_li)
 
-     ,.rs_i({score_rs2_li, score_rs1_li})
-     ,.rd_i(score_rd_li)
-     ,.rs_match_o(irs_match_lo)
-     ,.rd_match_o(ird_match_lo)
-     );
+   ,.rs_i1({score_rs2_li, score_rs1_li})
+   ,.rs_i2({score_rs2_li2, score_rs1_li2})
+   ,.rd_i(score_rd_li), .rd_i2(score_rd_li2)
 
-  logic [2:0] frs_match_lo;
-  logic       frd_match_lo;
+   ,.rs_match_o1(irs_match_lo), .rs_match_o2(irs_match_lo2)
+   ,.rd_match_o1(ird_match_lo), .rd_match_o2(ird_match_lo2)
+   );
+
+  logic [2:0] frs_match_lo, frs_match_lo2;
+  logic       frd_match_lo, frd_match_lo2;
   wire score_fp_v_li = (dispatch_pkt_cast_i.v & dispatch_pkt_cast_i.decode.late_fwb_v)
+    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode == `RV64_FLOAD_OP);
+  wire score_fp_v_li2 = (dispatch_pkt2_cast_i.v & dispatch_pkt2_cast_i.decode.late_fwb_v)
     || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode == `RV64_FLOAD_OP);
   wire clear_fp_v_li = fwb_pkt_cast_i.frd_w_v & fwb_pkt_cast_i.late;
   //Float point scoreboard
-  bp_be_scoreboard
+  bp_be_scoreboard_di
    #(.bp_params_p(bp_params_p), .num_rs_p(3))
-   fp_scoreboard
-    (.clk_i(clk_i)
-     ,.reset_i(reset_i)
+   fp_scoreboard_di
+  (.clk_i(clk_i)
+   ,.reset_i(reset_i)
 
-     ,.score_v_i(score_fp_v_li)
-     ,.score_rd_i(score_rd_li)
+   ,.score_v_i(score_fp_v_li), .score_v_i2(score_fp_v_li2)
+   ,.score_rd_i(score_rd_li), .score_rd_i2(score_rd_li2)
 
-     ,.clear_v_i(clear_fp_v_li)
-     ,.clear_rd_i(clear_frd_li)
+   ,.clear_v_i(clear_fp_v_li)
+   ,.clear_rd_i(clear_frd_li)
 
-     ,.rs_i({score_rs3_li, score_rs2_li, score_rs1_li})
-     ,.rd_i(score_rd_li)
-     ,.rs_match_o(frs_match_lo)
-     ,.rd_match_o(frd_match_lo)
-     );
+   ,.rs_i1({score_rs3_li, score_rs2_li, score_rs1_li})
+   ,.rs_i2({score_rs3_li2, score_rs2_li2, score_rs1_li2})
+   ,.rd_i(score_rd_li), .rd_i2(score_rd_li2)
+
+   ,.rs_match_o1(frs_match_lo), .rs_match_o2(frs_match_lo2)
+   ,.rd_match_o1(frd_match_lo), .rd_match_o2(frd_match_lo2)
+   );
 
   always_comb
     begin
@@ -183,20 +206,20 @@ module bp_be_detector
       irs2_sb_raw_haz1_v = (isd_status1_cast_i.irs2_v & irs_match_lo[1]) & (isd_status1_cast_i.rs2_addr != '0);
       ird_sb_waw_haz1_v = (isd_status1_cast_i.iwb_v & ird_match_lo) & (isd_status1_cast_i.rd_addr != '0);
 
-      irs1_sb_raw_haz2_v = (isd_status2_cast_i.irs1_v & irs_match_lo[0]) & (isd_status2_cast_i.rs1_addr != '0);
-      irs2_sb_raw_haz2_v = (isd_status2_cast_i.irs2_v & irs_match_lo[1]) & (isd_status2_cast_i.rs2_addr != '0);
-      ird_sb_waw_haz2_v = (isd_status2_cast_i.iwb_v & ird_match_lo) & (isd_status2_cast_i.rd_addr != '0);
+      irs1_sb_raw_haz2_v = (isd_status2_cast_i.irs1_v & irs_match_lo2[0]) & (isd_status2_cast_i.rs1_addr != '0);
+      irs2_sb_raw_haz2_v = (isd_status2_cast_i.irs2_v & irs_match_lo2[1]) & (isd_status2_cast_i.rs2_addr != '0);
+      ird_sb_waw_haz2_v = (isd_status2_cast_i.iwb_v & ird_match_lo2) & (isd_status2_cast_i.rd_addr != '0);
 
       frs1_sb_raw_haz1_v = (isd_status1_cast_i.frs1_v & frs_match_lo[0]);
       frs2_sb_raw_haz1_v = (isd_status1_cast_i.frs2_v & frs_match_lo[1]);
       frs3_sb_raw_haz1_v = (isd_status1_cast_i.frs3_v & frs_match_lo[2]);
 
-      frs1_sb_raw_haz2_v = (isd_status2_cast_i.frs1_v & frs_match_lo[0]);
-      frs2_sb_raw_haz2_v = (isd_status2_cast_i.frs2_v & frs_match_lo[1]);
-      frs3_sb_raw_haz2_v = (isd_status2_cast_i.frs3_v & frs_match_lo[2]);
+      frs1_sb_raw_haz2_v = (isd_status2_cast_i.frs1_v & frs_match_lo2[0]);
+      frs2_sb_raw_haz2_v = (isd_status2_cast_i.frs2_v & frs_match_lo2[1]);
+      frs3_sb_raw_haz2_v = (isd_status2_cast_i.frs3_v & frs_match_lo2[2]);
 
       frd_sb_waw_haz1_v = (isd_status1_cast_i.fwb_v & frd_match_lo);
-      frd_sb_waw_haz2_v = (isd_status2_cast_i.fwb_v & frd_match_lo);
+      frd_sb_waw_haz2_v = (isd_status2_cast_i.fwb_v & frd_match_lo2);
 
       // Detect integer and float data hazards for EX1
       irs1_data_haz1_v[0] = (isd_status1_cast_i.irs1_v & rs1_match_vector1[0])
@@ -389,21 +412,32 @@ module bp_be_detector
   bp_be_dep_status_s dep_status_n;
   always_comb
     begin
-      dep_status_n.instr_v    = dispatch_pkt_cast_i.v;
-      dep_status_n.mem_v      = dispatch_pkt_cast_i.decode.mem_v;
-      dep_status_n.csr_v      = (dispatch_pkt_cast_i.decode.csr_w_v | dispatch_pkt_cast_i.decode.csr_r_v);
-      dep_status_n.fflags_w_v = dispatch_pkt_cast_i.decode.fflags_w_v;
-      dep_status_n.ctl_iwb_v  = dispatch_pkt_cast_i.decode.pipe_ctl_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.int_iwb_v  = dispatch_pkt_cast_i.decode.pipe_int_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.int_fwb_v  = dispatch_pkt_cast_i.decode.pipe_int_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.aux_iwb_v  = dispatch_pkt_cast_i.decode.pipe_aux_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.aux_fwb_v  = dispatch_pkt_cast_i.decode.pipe_aux_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.emem_iwb_v = dispatch_pkt_cast_i.decode.pipe_mem_early_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.emem_fwb_v = dispatch_pkt_cast_i.decode.pipe_mem_early_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.fmem_iwb_v = dispatch_pkt_cast_i.decode.pipe_mem_final_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.fmem_fwb_v = dispatch_pkt_cast_i.decode.pipe_mem_final_v & dispatch_pkt_cast_i.decode.frf_w_v;
-      dep_status_n.mul_iwb_v  = dispatch_pkt_cast_i.decode.pipe_mul_v & dispatch_pkt_cast_i.decode.irf_w_v;
-      dep_status_n.fma_fwb_v  = dispatch_pkt_cast_i.decode.pipe_fma_v & dispatch_pkt_cast_i.decode.frf_w_v;
+      dep_status_n.instr_v    = dispatch_pkt_cast_i.v || dispatch_pkt2_cast_i.v;
+      dep_status_n.mem_v      = dispatch_pkt_cast_i.decode.mem_v || dispatch_pkt2_cast_i.decode.mem_v;
+      dep_status_n.csr_v      = (dispatch_pkt_cast_i.decode.csr_w_v | dispatch_pkt_cast_i.decode.csr_r_v) || (dispatch_pkt2_cast_i.decode.csr_w_v | dispatch_pkt2_cast_i.decode.csr_r_v);
+      dep_status_n.fflags_w_v = dispatch_pkt_cast_i.decode.fflags_w_v || dispatch_pkt2_cast_i.decode.fflags_w_v;
+      dep_status_n.ctl_iwb_v  = (dispatch_pkt_cast_i.decode.pipe_ctl_v & dispatch_pkt_cast_i.decode.irf_w_v)
+                                || (dispatch_pkt2_cast_i.decode.pipe_ctl_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.int_iwb_v  = (dispatch_pkt_cast_i.decode.pipe_int_v & dispatch_pkt_cast_i.decode.irf_w_v)
+                                || (dispatch_pkt2_cast_i.decode.pipe_int_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.int_fwb_v  = (dispatch_pkt_cast_i.decode.pipe_int_v & dispatch_pkt_cast_i.decode.frf_w_v)
+                                || (dispatch_pkt2_cast_i.decode.pipe_int_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.aux_iwb_v  = (dispatch_pkt_cast_i.decode.pipe_aux_v & dispatch_pkt_cast_i.decode.irf_w_v)
+                                ||(dispatch_pkt2_cast_i.decode.pipe_aux_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.aux_fwb_v  = (dispatch_pkt_cast_i.decode.pipe_aux_v & dispatch_pkt_cast_i.decode.frf_w_v) 
+                                || (dispatch_pkt2_cast_i.decode.pipe_aux_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.emem_iwb_v = (dispatch_pkt_cast_i.decode.pipe_mem_early_v & dispatch_pkt_cast_i.decode.irf_w_v)
+                                ||(dispatch_pkt2_cast_i.decode.pipe_mem_early_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.emem_fwb_v = (dispatch_pkt_cast_i.decode.pipe_mem_early_v & dispatch_pkt_cast_i.decode.frf_w_v)
+                                ||(dispatch_pkt2_cast_i.decode.pipe_mem_early_v & dispatch_pkt2_cast_i.decode.frf_w_v);
+      dep_status_n.fmem_iwb_v = (dispatch_pkt_cast_i.decode.pipe_mem_final_v & dispatch_pkt_cast_i.decode.irf_w_v)
+                                ||(dispatch_pkt2_cast_i.decode.pipe_mem_final_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.fmem_fwb_v = (dispatch_pkt_cast_i.decode.pipe_mem_final_v & dispatch_pkt_cast_i.decode.frf_w_v)
+                                ((dispatch_pkt2_cast_i.decode.pipe_mem_final_v & dispatch_pkt2_cast_i.decode.frf_w_v));
+      dep_status_n.mul_iwb_v  = (dispatch_pkt_cast_i.decode.pipe_mul_v & dispatch_pkt_cast_i.decode.irf_w_v)
+                                ||(dispatch_pkt2_cast_i.decode.pipe_mul_v & dispatch_pkt2_cast_i.decode.irf_w_v);
+      dep_status_n.fma_fwb_v  = (dispatch_pkt_cast_i.decode.pipe_fma_v & dispatch_pkt_cast_i.decode.frf_w_v)
+                                ||(dispatch_pkt2_cast_i.decode.pipe_fma_v & dispatch_pkt2_cast_i.decode.frf_w_v);
       dep_status_n.rd_addr    = dispatch_pkt_cast_i.instr.t.rtype.rd_addr;
     end
 
@@ -414,19 +448,3 @@ module bp_be_detector
     end
 
 endmodule
-
-Footer
-© 2022 GitHub, Inc.
-Footer navigation
-Terms
-Privacy
-Security
-Status
-Docs
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
-Dual-Issue-Black-Parrot/bp_be/src/v at Backend_modifications · Noahcdls/Dual-Issue-Black-ParrotDual-Issue-Black-Parrot/bp_be_detector.sv at Backend_modifications · Noahcdls/Dual-Issue-Black-Parrot

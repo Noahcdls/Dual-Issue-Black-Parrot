@@ -2,7 +2,7 @@
 `include "bp_common_defines.svh"
 `include "bp_be_defines.svh"
 
-module bp_be_scoreboard
+module bp_be_scoreboard_di
  import bp_common_pkg::*;
  import bp_be_pkg::*;
  #(parameter bp_params_e bp_params_p = e_bp_default_cfg
@@ -24,7 +24,7 @@ module bp_be_scoreboard
    , input               [reg_addr_width_gp-1:0] rd_i, rd_i2
 
    , output logic [num_rs_p-1:0]                 rs_match_o1, rs_match_o2
-   , output logic                                rd_match_o, rd_match_o2
+   , output logic                                rd_match_o1, rd_match_o2
    );
 
   localparam rf_els_lp = 2**reg_addr_width_gp;
@@ -61,9 +61,8 @@ module bp_be_scoreboard
    #(.width_p(rf_els_lp))
    scoreboard_reg
     (.clk_i(clk_i)
-     ,.reset_i(reset_i)
-
-     ,.set_i(score_onehot_li)
+     ,.reset_i(reset_i)s
+     ,.set_i(score_onehot_li || score_onehot_li2)
      ,.clear_i(clear_onehot_li)
      ,.data_o(scoreboard_r)
      );
