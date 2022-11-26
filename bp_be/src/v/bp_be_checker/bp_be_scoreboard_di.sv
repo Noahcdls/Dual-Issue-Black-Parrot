@@ -62,7 +62,7 @@ module bp_be_scoreboard_di
    scoreboard_reg
     (.clk_i(clk_i)
      ,.reset_i(reset_i)s
-     ,.set_i(score_onehot_li || score_onehot_li2)
+     ,.set_i(score_onehot_li | score_onehot_li2)
      ,.clear_i(clear_onehot_li)
      ,.data_o(scoreboard_r)
      );
