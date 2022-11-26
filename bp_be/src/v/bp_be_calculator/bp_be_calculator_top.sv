@@ -174,16 +174,25 @@ module bp_be_calculator_top
     end
 
   // Override operands with bypass data
-  bp_be_dispatch_pkt_s reservation_n, reservation_r;
+  // !!double the reservation
+  // !!wire int_reservation = reservation1.decode.pipe_int ? reservation1 : reservation2;
+  bp_be_dispatch_pkt_s reservation_n_1, reservation_r_1;
   always_comb
     begin
-       // !!double the reservation
-       // !!wire int_reservation = reservation1.decode.pipe_int ? reservation1 : reservation2;
-      reservation_n        = dispatch_pkt_i;
-      reservation_n.rs1    = bypass_s[0];
-      reservation_n.rs2    = bypass_rs[1];
-      reservation_n.imm    = bypass_rs[2];
+      reservation_n_1        = dispatch_pkt_i_1;
+      reservation_n_1.rs1    = bypass_s[0];
+      reservation_n_1.rs2    = bypass_rs[1];
+      reservation_n_1.imm    = bypass_rs[2];
     end
+  bp_be_dispatch_pkt_s reservation_n_2, reservation_r_2;
+  always_comb
+    begin
+      reservation_n_2        = dispatch_pkt_i_2;
+      reservation_n_2.rs1    = bypass_s[0];
+      reservation_n_2.rs2    = bypass_rs[1];
+      reservation_n_2.imm    = bypass_rs[2];
+    end
+  wire int_reservation = reservation_n_1.decode.pipe_int ? reservation_n_1 : reservation_n_2;
   wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
 
   bsg_dff
@@ -257,7 +266,7 @@ module bp_be_calculator_top
      ,.reset_i(reset_i)
 
       //!! reservation replacement
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.data_o(pipe_int_data_lo)
