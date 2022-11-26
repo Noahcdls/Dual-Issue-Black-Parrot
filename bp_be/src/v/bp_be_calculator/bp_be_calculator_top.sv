@@ -192,16 +192,18 @@ module bp_be_calculator_top
       reservation_n_2.rs2    = bypass_rs[1];
       reservation_n_2.imm    = bypass_rs[2];
     end
-  wire int_reservation = reservation_n_1.decode.pipe_int ? reservation_n_1 : reservation_n_2;
+  wire int_reservation_n = reservation_r_1.decode.pipe_int ? reservation_n_1 : reservation_n_2;
+  wire int_reservation_r = reservation_r_1.decode.pipe_int ? reservation_r_1 : reservation_r_2;
   wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
 
   bsg_dff
    #(.width_p(dispatch_pkt_width_lp))
    reservation_reg
     (.clk_i(clk_i)
-     ,.data_i(reservation_n)
-     ,.data_o(reservation_r)
+     ,.data_i(int_eservation_n)
+     ,.data_o(int_reservation_r)
      );
+
 
   // Control pipe: 1 cycle latency
   bp_be_pipe_ctl
@@ -210,7 +212,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation_r)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.data_o(pipe_ctl_data_lo)
@@ -227,7 +229,7 @@ module bp_be_calculator_top
      ,.reset_i(reset_i)
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation_r)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.retire_v_i(exc_stage_r[2].v)
@@ -280,7 +282,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation_r)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.frm_dyn_i(frm_dyn_lo)
 
@@ -301,7 +303,7 @@ module bp_be_calculator_top
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.sfence_i(commit_pkt_cast_o.sfence)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation_r)
      ,.ready_o(mem_ready_o)
 
      ,.commit_pkt_i(commit_pkt_cast_o)
@@ -372,7 +374,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation_r)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.frm_dyn_i(frm_dyn_lo)
 
@@ -390,7 +392,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(int_reservation_r)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.iready_o(idiv_ready_o)
      ,.fready_o(fdiv_ready_o)
@@ -414,10 +416,10 @@ module bp_be_calculator_top
         begin : comp_stage
           // Normally, shift down in the pipe
           comp_stage_n[i] = (i == 0)
-            ? '{ird_w_v    : reservation_n.decode.irf_w_v
-                ,frd_w_v   : reservation_n.decode.frf_w_v
-                ,fflags_w_v: reservation_n.decode.fflags_w_v
-                ,rd_addr   : reservation_n.instr.t.rtype.rd_addr
+            ? '{ird_w_v    : int_reservation_n.decode.irf_w_v
+                ,frd_w_v   : int_reservation_n.decode.frf_w_v
+                ,fflags_w_v: int_reservation_n.decode.fflags_w_v
+                ,rd_addr   : int_reservation_n.instr.t.rtype.rd_addr
                 ,default: '0
                 }
             : comp_stage_r[i-1];
@@ -473,20 +475,20 @@ module bp_be_calculator_top
           // Normally, shift down in the pipe
           exc_stage_n[i] = (i == 0) ? '0 : exc_stage_r[i-1];
         end
-          exc_stage_n[0].v                       = reservation_n.v;
+          exc_stage_n[0].v                       = int_reservation_n.v;
           exc_stage_n[0].v                      &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[1].v                      &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[2].v                      &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[3].v                      &= commit_pkt_cast_o.instret;
 
-          exc_stage_n[0].queue_v                 = reservation_n.queue_v;
+          exc_stage_n[0].queue_v                 = int_reservation_n.queue_v;
           exc_stage_n[0].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[1].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[2].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[3].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
 
-          exc_stage_n[0].spec                   |= reservation_n.special;
-          exc_stage_n[0].exc                    |= reservation_n.exception;
+          exc_stage_n[0].spec                   |= int_reservation_n.special;
+          exc_stage_n[0].exc                    |= int_reservation_n.exception;
 
           exc_stage_n[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo;
           exc_stage_n[1].spec.csrw              |= pipe_sys_csrw_lo;
