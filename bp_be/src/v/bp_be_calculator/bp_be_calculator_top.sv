@@ -41,6 +41,7 @@ module bp_be_calculator_top
   , input [cfg_bus_width_lp-1:0]                    cfg_bus_i
 
   // Calculator - Checker interface
+  // dispatch_pkt1_i
   , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i_1
   , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i_2
 
@@ -176,6 +177,7 @@ module bp_be_calculator_top
   // Override operands with bypass data
   // !!double the reservation
   // !!wire int_reservation = reservation1.decode.pipe_int ? reservation1 : reservation2;
+  // reservation_n1
   bp_be_dispatch_pkt_s reservation_n_1, reservation_r_1;
   always_comb
     begin
@@ -192,16 +194,30 @@ module bp_be_calculator_top
       reservation_n_2.rs2    = bypass_rs[1];
       reservation_n_2.imm    = bypass_rs[2];
     end
-  wire int_reservation_n = reservation_r_1.decode.pipe_int ? reservation_n_1 : reservation_n_2;
-  wire int_reservation_r = reservation_r_1.decode.pipe_int ? reservation_r_1 : reservation_r_2;
+  wire ctl_reservation = reservation_r_1.decode.pipe_ctl ? reservation_r_1 : reservation_r_2;
+  wire sys_reservation = reservation_r_1.decode.pipe_sys ? reservation_r_1 : reservation_r_2;
+  wire int_reservation = reservation_r_1.decode.pipe_int ? reservation_r_1 : reservation_r_2;
+  wire aux_reservation = reservation_r_1.decode.pipe_aux ? reservation_r_1 : reservation_r_2;
+  wire mem_reservation = reservation_r_1.decode.pipe_mem ? reservation_r_1 : reservation_r_2;
+  wire fma_reservation = reservation_r_1.decode.pipe_fma ? reservation_r_1 : reservation_r_2;
+  wire long_reservation = reservation_r_1.decode.pipe_long ? reservation_r_1 : reservation_r_2;
   wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
 
   bsg_dff
    #(.width_p(dispatch_pkt_width_lp))
-   reservation_reg
+   reservation_reg_1
     (.clk_i(clk_i)
-     ,.data_i(int_eservation_n)
-     ,.data_o(int_reservation_r)
+     ,.data_i(reservation_n_1)
+     ,.data_o(reservation_r_1)
+     );
+
+  // !!
+  bsg_dff
+   #(.width_p(dispatch_pkt_width_lp))
+   reservation_reg_2
+    (.clk_i(clk_i)
+     ,.data_i(reservation_n_2)
+     ,.data_o(reservation_r_2)
      );
 
 
@@ -212,7 +228,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(int_reservation_r)
+     ,.reservation_i(ctl_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.data_o(pipe_ctl_data_lo)
@@ -229,7 +245,7 @@ module bp_be_calculator_top
      ,.reset_i(reset_i)
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.reservation_i(int_reservation_r)
+     ,.reservation_i(sys_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.retire_v_i(exc_stage_r[2].v)
@@ -282,7 +298,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(int_reservation_r)
+     ,.reservation_i(aux_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.frm_dyn_i(frm_dyn_lo)
 
@@ -303,7 +319,7 @@ module bp_be_calculator_top
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.sfence_i(commit_pkt_cast_o.sfence)
 
-     ,.reservation_i(int_reservation_r)
+     ,.reservation_i(mem_reservation)
      ,.ready_o(mem_ready_o)
 
      ,.commit_pkt_i(commit_pkt_cast_o)
@@ -374,7 +390,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(int_reservation_r)
+     ,.reservation_i(fma_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.frm_dyn_i(frm_dyn_lo)
 
@@ -392,7 +408,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(int_reservation_r)
+     ,.reservation_i(long_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.iready_o(idiv_ready_o)
      ,.fready_o(fdiv_ready_o)
