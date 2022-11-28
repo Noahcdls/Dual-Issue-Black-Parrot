@@ -42,8 +42,8 @@ module bp_be_calculator_top
 
   // Calculator - Checker interface
   // dispatch_pkt1_i
-  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i_1
-  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i_2
+  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt1_i
+  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt2_i
 
   , output logic                                    idiv_ready_o
   , output logic                                    fdiv_ready_o
@@ -98,7 +98,9 @@ module bp_be_calculator_top
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
-  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
+  `bp_cast_i(bp_be_dispatch_pkt1_s, dispatch_pkt1);
+  // ?? is this correct
+  `bp_cast_i(bp_be_dispatch_pkt2_s, dispatch_pkt2);
   `bp_cast_o(bp_be_commit_pkt_s, commit_pkt);
 
 
@@ -143,6 +145,7 @@ module bp_be_calculator_top
   logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data;
   for (genvar i = 0; i < pipe_stage_els_lp; i++)
     begin : forward_match
+      // ?? also double match_rs to match_rs2
       assign match_rs[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr))
                               || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr));
       assign match_rs[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr))
@@ -153,6 +156,7 @@ module bp_be_calculator_top
     end
 
   logic [2:0][dpath_width_gp-1:0] bypass_rs;
+  //?? wire [2:0][dpath_width_gp-1:0] dispatch_data2 = {dispatch_pkt2_cast_i.imm, dispatch_pkt2_cast_i.rs2, dispatch_pkt2_cast_i.rs1};
   wire [2:0][dpath_width_gp-1:0] dispatch_data = {dispatch_pkt_cast_i.imm, dispatch_pkt_cast_i.rs2, dispatch_pkt_cast_i.rs1};
   for (genvar i = 0; i < 3; i++)
     begin : pencode
@@ -181,7 +185,7 @@ module bp_be_calculator_top
   bp_be_dispatch_pkt_s reservation_n_1, reservation_r_1;
   always_comb
     begin
-      reservation_n_1        = dispatch_pkt_i_1;
+      reservation_n_1        = dispatch_pkt1_i;
       reservation_n_1.rs1    = bypass_s[0];
       reservation_n_1.rs2    = bypass_rs[1];
       reservation_n_1.imm    = bypass_rs[2];
@@ -189,7 +193,7 @@ module bp_be_calculator_top
   bp_be_dispatch_pkt_s reservation_n_2, reservation_r_2;
   always_comb
     begin
-      reservation_n_2        = dispatch_pkt_i_2;
+      reservation_n_2        = dispatch_pkt2_i;
       reservation_n_2.rs1    = bypass_s[0];
       reservation_n_2.rs2    = bypass_rs[1];
       reservation_n_2.imm    = bypass_rs[2];
@@ -201,6 +205,7 @@ module bp_be_calculator_top
   wire mem_reservation = reservation_r_1.decode.pipe_mem ? reservation_r_1 : reservation_r_2;
   wire fma_reservation = reservation_r_1.decode.pipe_fma ? reservation_r_1 : reservation_r_2;
   wire long_reservation = reservation_r_1.decode.pipe_long ? reservation_r_1 : reservation_r_2;
+  //?? wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
   wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
 
   bsg_dff
@@ -211,7 +216,6 @@ module bp_be_calculator_top
      ,.data_o(reservation_r_1)
      );
 
-  // !!
   bsg_dff
    #(.width_p(dispatch_pkt_width_lp))
    reservation_reg_2
