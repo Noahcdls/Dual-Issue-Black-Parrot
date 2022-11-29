@@ -11,7 +11,7 @@
  *   Exception aggregation could be simplified with constants and more thought. Should fix
  *     once code is more stable, fixing in cleanup could cause regressions
  */
-
+//Guangzhe's update
 `include "bp_common_defines.svh"
 `include "bp_be_defines.svh"
 
@@ -41,7 +41,9 @@ module bp_be_calculator_top
   , input [cfg_bus_width_lp-1:0]                    cfg_bus_i
 
   // Calculator - Checker interface
-  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt_i
+  // dispatch_pkt1_i
+  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt1_i
+  , input [dispatch_pkt_width_lp-1:0]               dispatch_pkt2_i
 
   , output logic                                    idiv_ready_o
   , output logic                                    fdiv_ready_o
@@ -96,7 +98,10 @@ module bp_be_calculator_top
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
-  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
+  // Fixed casting - Noah
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt1);
+  // ?? is this correct
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2);
   `bp_cast_o(bp_be_commit_pkt_s, commit_pkt);
 
 
@@ -138,23 +143,40 @@ module bp_be_calculator_top
 
   // Generating match vector for bypass
   logic [2:0][pipe_stage_els_lp-1:0] match_rs;
+  logic [2:0][pipe_stage_els_lp-1:0] match2_rs;
   logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data;
   for (genvar i = 0; i < pipe_stage_els_lp; i++)
     begin : forward_match
+      // ?? also double match_rs to match_rs2
+      //Yes this needs to be doubled
+
+      //valid dispatch in queue and not fp and int write, and dispatch's fma rs addr is actively being computed
+      //same for fp
+      //tries to detect if upcoming fma instr are being written to and we need to wait
       assign match_rs[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr))
                               || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr));
       assign match_rs[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr))
                               || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs2_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr));
       assign match_rs[2][i] = ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs3_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r[i].rd_addr));
 
+      assign match2_rs[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr))
+                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs1_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr));
+      assign match2_rs[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr))
+                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs2_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr));
+      assign match2_rs[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r[i].rd_addr));
+
       assign forward_data[i] = comp_stage_n[i+1].rd_data;
     end
 
   logic [2:0][dpath_width_gp-1:0] bypass_rs;
+  logic [2:0][dpath_width_gp-1:0] bypass2_rs;
+  //?? wire [2:0][dpath_width_gp-1:0] dispatch_data2 = {dispatch_pkt2_cast_i.imm, dispatch_pkt2_cast_i.rs2, dispatch_pkt2_cast_i.rs1};
+  wire [2:0][dpath_width_gp-1:0] dispatch_data2 = {dispatch_pkt2_cast_i.imm, dispatch_pkt2_cast_i.rs2, dispatch_pkt2_cast_i.rs1};
   wire [2:0][dpath_width_gp-1:0] dispatch_data = {dispatch_pkt_cast_i.imm, dispatch_pkt_cast_i.rs2, dispatch_pkt_cast_i.rs1};
   for (genvar i = 0; i < 3; i++)
     begin : pencode
       logic [pipe_stage_els_lp:0] match_rs_onehot;
+      logic [pipe_stage_els_lp:0] match2_rs_onehot;
       bsg_priority_encode_one_hot_out
        #(.width_p(pipe_stage_els_lp+1), .lo_to_hi_p(1))
        pencode_oh
@@ -170,26 +192,72 @@ module bp_be_calculator_top
          ,.sel_one_hot_i(match_rs_onehot)
          ,.data_o(bypass_rs[i])
          );
+
+      logic [pipe_stage_els_lp:0] match_rs_onehot;
+      bsg_priority_encode_one_hot_out
+       #(.width_p(pipe_stage_els_lp+1), .lo_to_hi_p(1))
+       pencode_oh2
+        (.i({1'b1, match2_rs[i]})
+         ,.o(match2_rs_onehot)
+         ,.v_o()
+         );
+
+      bsg_mux_one_hot
+       #(.width_p(dpath_width_gp), .els_p(pipe_stage_els_lp+1))
+       fwd_mux_oh2
+        (.data_i({dispatch_data2[i], forward_data})
+         ,.sel_one_hot_i(match2_rs_onehot)
+         ,.data_o(bypass2_rs[i])
+         );
     end
 
   // Override operands with bypass data
-  bp_be_dispatch_pkt_s reservation_n, reservation_r;
+  // !!double the reservation
+  // !!wire int_reservation = reservation1.decode.pipe_int ? reservation1 : reservation2;
+  // reservation_n1
+  bp_be_dispatch_pkt_s reservation_n_1, reservation_r_1;
   always_comb
     begin
-      reservation_n        = dispatch_pkt_i;
-      reservation_n.rs1    = bypass_rs[0];
-      reservation_n.rs2    = bypass_rs[1];
-      reservation_n.imm    = bypass_rs[2];
+      reservation_n_1        = dispatch_pkt1_i;
+      reservation_n_1.rs1    = bypass_rs[0];
+      reservation_n_1.rs2    = bypass_rs[1];
+      reservation_n_1.imm    = bypass_rs[2];
     end
+  bp_be_dispatch_pkt_s reservation_n_2, reservation_r_2;
+  always_comb
+    begin
+      reservation_n_2        = dispatch_pkt2_i;
+      reservation_n_2.rs1    = bypass2_rs[0];
+      reservation_n_2.rs2    = bypass2_rs[1];
+      reservation_n_2.imm    = bypass2_rs[2];
+    end
+  wire ctl_reservation = reservation_r_1.decode.pipe_ctl ? reservation_r_1 : reservation_r_2;
+  wire sys_reservation = reservation_r_1.decode.pipe_sys ? reservation_r_1 : reservation_r_2;
+  wire int_reservation = reservation_r_1.decode.pipe_int ? reservation_r_1 : reservation_r_2;
+  wire aux_reservation = reservation_r_1.decode.pipe_aux ? reservation_r_1 : reservation_r_2;
+  wire mem_reservation = reservation_r_1.decode.pipe_mem ? reservation_r_1 : reservation_r_2;
+  wire fma_reservation = reservation_r_1.decode.pipe_fma ? reservation_r_1 : reservation_r_2;
+  wire long_reservation = reservation_r_1.decode.pipe_long ? reservation_r_1 : reservation_r_2;
+  //?? wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
   wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
+  wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
 
   bsg_dff
    #(.width_p(dispatch_pkt_width_lp))
-   reservation_reg
+   reservation_reg_1
     (.clk_i(clk_i)
-     ,.data_i(reservation_n)
-     ,.data_o(reservation_r)
+     ,.data_i(reservation_n_1)
+     ,.data_o(reservation_r_1)
      );
+
+  bsg_dff
+   #(.width_p(dispatch_pkt_width_lp))
+   reservation_reg_2
+    (.clk_i(clk_i)
+     ,.data_i(reservation_n_2)
+     ,.data_o(reservation_r_2)
+     );
+
 
   // Control pipe: 1 cycle latency
   bp_be_pipe_ctl
@@ -198,7 +266,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(ctl_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.data_o(pipe_ctl_data_lo)
@@ -215,7 +283,7 @@ module bp_be_calculator_top
      ,.reset_i(reset_i)
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(sys_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.retire_v_i(exc_stage_r[2].v)
@@ -253,7 +321,8 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+      //!! reservation replacement
+     ,.reservation_i(int_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.data_o(pipe_int_data_lo)
@@ -267,7 +336,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(aux_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.frm_dyn_i(frm_dyn_lo)
 
@@ -288,7 +357,7 @@ module bp_be_calculator_top
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.sfence_i(commit_pkt_cast_o.sfence)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(mem_reservation)
      ,.ready_o(mem_ready_o)
 
      ,.commit_pkt_i(commit_pkt_cast_o)
@@ -359,7 +428,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(fma_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.frm_dyn_i(frm_dyn_lo)
 
@@ -377,7 +446,7 @@ module bp_be_calculator_top
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.reservation_i(reservation_r)
+     ,.reservation_i(long_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
      ,.iready_o(idiv_ready_o)
      ,.fready_o(fdiv_ready_o)
@@ -400,17 +469,20 @@ module bp_be_calculator_top
       for (integer i = 0; i <= pipe_stage_els_lp; i++)
         begin : comp_stage
           // Normally, shift down in the pipe
+          //integer reg file
+          //floating reg file
+          //so this is for R type function which is register functions with two regs and a destination
           comp_stage_n[i] = (i == 0)
-            ? '{ird_w_v    : reservation_n.decode.irf_w_v
-                ,frd_w_v   : reservation_n.decode.frf_w_v
-                ,fflags_w_v: reservation_n.decode.fflags_w_v
-                ,rd_addr   : reservation_n.instr.t.rtype.rd_addr
+            ? '{ird_w_v    : reservation_n_1.decode.irf_w_v | reservation_n_2.decode.irf_w_v
+                ,frd_w_v   : reservation_n_1.decode.frf_w_v | reservation_n_2.decode.frf_w_v
+                ,fflags_w_v: reservation_n_1.decode.fflags_w_v | reservation_n_2.decode.fflags_w_v
+                ,rd_addr   : (reservation_n_1.decode.irf_w_v | reservation_n_1.decode.frf_w_v | reservation_n_1.decode.fflags_w_v) ? reservation_n_1.instr.t.rtype.rd_addr : reservation_n_2.instr.t.rtype.rd_addr 
                 ,default: '0
                 }
             : comp_stage_r[i-1];
         end
       // Injected instructions can carry a payload in rs2
-      comp_stage_n[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : '0;
+      comp_stage_n[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : injection2 ? dispatch_pkt2_cast_i.rs2 : '0;
       comp_stage_n[1].rd_data    |= pipe_int_data_lo_v       ? pipe_int_data_lo         : '0;
       comp_stage_n[1].rd_data    |= pipe_ctl_data_lo_v       ? pipe_ctl_data_lo         : '0;
       comp_stage_n[1].rd_data    |= pipe_sys_data_lo_v       ? pipe_sys_data_lo         : '0;
@@ -460,20 +532,21 @@ module bp_be_calculator_top
           // Normally, shift down in the pipe
           exc_stage_n[i] = (i == 0) ? '0 : exc_stage_r[i-1];
         end
-          exc_stage_n[0].v                       = reservation_n.v;
+          exc_stage_n[0].v                       = reservation_n_1.v | reservation_n_2.v;
           exc_stage_n[0].v                      &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[1].v                      &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[2].v                      &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[3].v                      &= commit_pkt_cast_o.instret;
 
-          exc_stage_n[0].queue_v                 = reservation_n.queue_v;
+          exc_stage_n[0].queue_v                 = reservation_n_1.queue_v | reservation_n_2.queue_v;
           exc_stage_n[0].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[1].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[2].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
           exc_stage_n[3].queue_v                &= ~commit_pkt_cast_o.npc_w_v;
 
-          exc_stage_n[0].spec                   |= reservation_n.special;
-          exc_stage_n[0].exc                    |= reservation_n.exception;
+          //special and exception hold a bits for particular cases that we might as well combine
+          exc_stage_n[0].spec                   |= (reservation_n_1.special | reservation_n_2.special);
+          exc_stage_n[0].exc                    |= (reservation_n_1.exception | reservation_n_2.exception);
 
           exc_stage_n[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo;
           exc_stage_n[1].spec.csrw              |= pipe_sys_csrw_lo;
@@ -513,4 +586,3 @@ module bp_be_calculator_top
   assign fwb_pkt_o = pipe_mem_late_fwb_pkt_yumi ? pipe_mem_late_fwb_pkt : pipe_long_fdata_lo_yumi ? long_fwb_pkt : comp_stage_r[4];
 
 endmodule
-

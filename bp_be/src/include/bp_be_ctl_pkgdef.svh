@@ -200,8 +200,8 @@
     logic                             pipe_fma_v;
     logic                             pipe_long_v;
 
-    logic                             irf_w_v;
-    logic                             frf_w_v;
+    logic                             irf_w_v; //integer reg file
+    logic                             frf_w_v; //floating reg file
     logic                             fflags_w_v;
     logic                             dcache_r_v;
     logic                             dcache_w_v;
