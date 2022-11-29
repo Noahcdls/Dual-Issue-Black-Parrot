@@ -9,6 +9,11 @@
  *
  * Notes:
  *
+ * Modifications:
+ *   1. doubled inputs: isd_status_i
+ *   2. doubled outputs: 
+ *   3. commit_pkt contains the info about npc, should we double that?
+ *   4. assuming only instr1 contains branch here
  */
 
 `include "bp_common_defines.svh"
@@ -33,7 +38,7 @@ module bp_be_director
    , input [cfg_bus_width_lp-1:0]       cfg_bus_i
 
    // Dependency information
-   , input [isd_status_width_lp-1:0]    isd_status_i
+   , input [isd_status_width_lp-1:0]    isd_status1_i, isd_status2_i
    , output logic [vaddr_width_p-1:0]   expected_npc_o
    , output logic                       poison_isd_o
    , output logic                       suppress_iss_o
@@ -59,7 +64,8 @@ module bp_be_director
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
-  `bp_cast_i(bp_be_isd_status_s, isd_status);
+  `bp_cast_i(bp_be_isd_status_s, isd_status1);
+  `bp_cast_i(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_branch_pkt_s, br_pkt);
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
 
@@ -81,6 +87,7 @@ module bp_be_director
 
   // Module instantiations
   // Update the NPC on a valid instruction in ex1 or upon commit
+  // Should we double this??
   wire npc_w_v = commit_pkt_cast_i.npc_w_v | br_pkt_cast_i.v;
   assign npc_n = commit_pkt_cast_i.npc_w_v ? commit_pkt_cast_i.npc : br_pkt_cast_i.npc;
   bsg_dff_reset_en
@@ -95,7 +102,8 @@ module bp_be_director
      );
   assign expected_npc_o = npc_w_v ? npc_n : npc_r;
 
-  assign npc_mismatch_v = isd_status_cast_i.v & (expected_npc_o != isd_status_cast_i.pc);
+  //assuming only issue 1 has branch
+  assign npc_mismatch_v = (isd_status1_cast_i.v & (expected_npc_o != isd_status1_cast_i.pc));
   assign poison_isd_o = commit_pkt_cast_i.npc_w_v | npc_mismatch_v;
 
   logic btaken_pending, attaboy_pending;
@@ -106,7 +114,7 @@ module bp_be_director
      ,.reset_i(reset_i)
 
      ,.set_i({br_pkt_cast_i.btaken, br_pkt_cast_i.branch})
-     ,.clear_i({isd_status_cast_i.v, isd_status_cast_i.v})
+     ,.clear_i({isd_status1_cast_i.v, isd_status1_cast_i.v})
      ,.data_o({btaken_pending, attaboy_pending})
      );
   wire last_instr_was_branch = attaboy_pending | br_pkt_cast_i.branch;
@@ -224,12 +232,12 @@ module bp_be_director
 
           fe_cmd_v_li = fe_cmd_ready_lo;
         end
-      else if (isd_status_cast_i.v & npc_mismatch_v)
+      else if (isd_status1_cast_i.v & npc_mismatch_v)
         begin
           fe_cmd_li.opcode                                 = e_op_pc_redirection;
           fe_cmd_li.vaddr                                  = expected_npc_o;
           fe_cmd_pc_redirect_operands.subopcode            = e_subop_branch_mispredict;
-          fe_cmd_pc_redirect_operands.branch_metadata_fwd  = isd_status_cast_i.branch_metadata_fwd;
+          fe_cmd_pc_redirect_operands.branch_metadata_fwd  = isd_status1_cast_i.branch_metadata_fwd;
           fe_cmd_pc_redirect_operands.misprediction_reason = last_instr_was_branch
                                                              ? last_instr_was_btaken
                                                                ? e_incorrect_pred_taken
@@ -240,12 +248,12 @@ module bp_be_director
           fe_cmd_v_li = fe_cmd_ready_lo;
         end
       // Send an attaboy if there's a correct prediction
-      else if (isd_status_cast_i.v & ~npc_mismatch_v & last_instr_was_branch)
+      else if (isd_status1_cast_i.v & ~npc_mismatch_v & last_instr_was_branch)
         begin
           fe_cmd_li.opcode                               = e_op_attaboy;
           fe_cmd_li.vaddr                                = expected_npc_o;
           fe_cmd_li.operands.attaboy.taken               = last_instr_was_btaken;
-          fe_cmd_li.operands.attaboy.branch_metadata_fwd = isd_status_cast_i.branch_metadata_fwd;
+          fe_cmd_li.operands.attaboy.branch_metadata_fwd = isd_status1_cast_i.branch_metadata_fwd;
 
           fe_cmd_v_li = fe_cmd_ready_lo;
         end
@@ -272,4 +280,3 @@ module bp_be_director
      );
 
 endmodule
-

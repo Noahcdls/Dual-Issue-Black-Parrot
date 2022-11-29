@@ -1,3 +1,12 @@
+/* 
+ * Modifications: 
+ *   1. doubled inputs: fe_queue_i, fe_queue_v_i, fe_queue_yumi_i
+ *   2. doubled outputs: fe_queue_o, fe_queue_v_o, preissue_pkt_o, issue_pkt_o
+ *   3. To be determined ports:  clr_v_i
+ *   4. Changed module: reg_fifo_mem -> 2r2w
+ *   5. Checkpoint ptr jmp step doubled
+ *   6. instr type conflict should be solved in calculator
+ */
 
 `include "bp_common_defines.svh"
 `include "bp_be_defines.svh"
@@ -15,81 +24,92 @@ module bp_be_issue_queue
   (input                                    clk_i
    , input                                  reset_i
 
-   , input                                  clr_v_i
-   , input                                  deq_v_i
-   , input                                  roll_v_i
+   , input                                  clr_v_i // from director
+   , input                                  deq_v_i // from commit_pkt
+   , input                                  roll_v_i // from commit_pkt
 
-   , input [fe_queue_width_lp-1:0]          fe_queue_i
-   , input                                  fe_queue_v_i
+   , input [fe_queue_width_lp-1:0]          fe_queue1_i, fe_queue2_i
+   , input                                  fe_queue_v1_i, fe_queue_v2_i
    , output logic                           fe_queue_ready_o
 
-   , output logic [fe_queue_width_lp-1:0]   fe_queue_o
+   , output logic [fe_queue_width_lp-1:0]   fe_queue1_o, fe_queue2_o
    , output logic                           fe_queue_v_o
-   , input                                  fe_queue_yumi_i
+   , input                                  fe_queue_yumi1_i, fe_queue_yumi2_i
 
-   , output logic [issue_pkt_width_lp-1:0]  preissue_pkt_o
-   , output logic [issue_pkt_width_lp-1:0]  issue_pkt_o
+   , output logic [issue_pkt_width_lp-1:0]  preissue_pkt1_o, preissue_pkt2_o
+   , output logic [issue_pkt_width_lp-1:0]  issue_pkt1_o, issue_pkt2_o
    );
 
   `declare_bp_core_if(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
-  `bp_cast_i(bp_fe_queue_s, fe_queue);
-  `bp_cast_o(bp_fe_queue_s, fe_queue);
+
+  `bp_cast_i(bp_fe_queue_s, fe_queue1);
+  `bp_cast_i(bp_fe_queue_s, fe_queue2);
+  `bp_cast_o(bp_fe_queue_s, fe_queue1);
+  `bp_cast_o(bp_fe_queue_s, fe_queue2);
+
 
   // One read pointer, one write pointer, one checkpoint pointer
   // ptr_width + 1 for wrap bit
   logic [ptr_width_lp:0] wptr_n, rptr_n, cptr_n;
   logic [ptr_width_lp:0] wptr_r, rptr_r, cptr_r;
+  
+  logic [ptr_width_lp:0] wptr1_n, rptr1_n, wptr2_n, rptr2_n;
+  logic [ptr_width_lp:0] wptr1_r, rptr1_r, wptr2_r, rptr2_r;
 
   // Used to catch up on roll and clear
   logic [ptr_width_lp:0] wptr_jmp, rptr_jmp;
-  logic cptr_jmp;
+  logic [1:0] cptr_jmp; //extra bit added
 
   // Operations
-  //enable queue to consume
-  wire enq  = fe_queue_ready_o & fe_queue_v_i;
-  //dequeue
-  wire deq  = deq_v_i;
-  //reading with consume
-  wire read = fe_queue_yumi_i;
-  //valid clear
-  wire clr  = clr_v_i;
-  //roll queue(rollback support)
-  wire roll = roll_v_i;
+  // enq doubled
+  wire enq1  = fe_queue_ready_o & fe_queue_v1_i;
+  wire enq2  = fe_queue_ready_o & fe_queue_v2_i;
 
-//reading increases queue length
-//writing catches up
+  wire deq  = deq_v_i; // = commit_pkt_cast_i.queue_v;
+  wire read = fe_queue_yumi1_i & fe_queue_yumi2_i;
+  wire clr  = clr_v_i; // = suppress_iss_i = (state_r != e_run)
+  wire roll = roll_v_i; // = commit_pkt_cast_i.npc_w_v;
 
-//read pointer jump
-//if we are rolling back, check point - read pointer + dequeue
-//if read just go to next spot
-  assign rptr_jmp = roll
-                    ? (cptr_r - rptr_r + (ptr_width_lp+1)'(deq))
-                    : read
-                       ? ((ptr_width_lp+1)'(1))
+  assign rptr_jmp = roll // = commit_pkt_cast_i.npc_w_v
+                    ? (cptr_r - rptr_r + (ptr_width_lp+1)'(deq))//if not pc, to the next line of cptr
+                    : read // read new instr 
+                       ? ((ptr_width_lp+1)'(2))
                        : ((ptr_width_lp+1)'(0));
-  //if clear, read - write + 1 if we are reading
   assign wptr_jmp = clr
-                    ? (rptr_r - wptr_r + (ptr_width_lp+1)'(read))
-                    : enq
+                    ? (rptr_r - wptr_r + (ptr_width_lp+1)'(read))//if clr, to the next line of rptr
+                    : enq1 & enq2 // new instr inserted
+                       ? ((ptr_width_lp+1)'(2))
+                       : enq1 ^ enq2
                        ? ((ptr_width_lp+1)'(1))
                        : ((ptr_width_lp+1)'(0));
-  //checkpoint is if we are dequeueing at all and are removing something from the FIFO                     
-  assign cptr_jmp = deq_v_i;
+  
+  assign cptr_jmp = (deq_v_i + 1'b1); // = commit_pkt_cast_i.queue_v + 1
 
-// empty if read and write pointers are caught up
+  // reassign pointers
+  assign wptr1_n = wptr_n;
+  assign wptr2_n = wptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
+  assign wptr1_r = wptr_r;
+  assign wptr2_r = wptr_r + (ptr_width_lp)'(1);
+
+  assign rptr1_n = rptr_n;
+  assign rptr2_n = rptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
+  assign rptr1_r = rptr_r;
+  assign rptr2_r = rptr_r + (ptr_width_lp)'(1);
+
   wire empty = (rptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
                & (rptr_r[ptr_width_lp] == wptr_r[ptr_width_lp]);
-//empty followign stage if same condition
   wire empty_n = (rptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp])
                  & (rptr_n[ptr_width_lp] == wptr_n[ptr_width_lp]);
-  //full if lower bits match but upper dont (overflow bit)
-  wire full  = (cptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
+
+  //Noah: Updated full wires to ensure we can only have an even amount when we are full               
+  wire full  = ((cptr_r[0+:ptr_width_lp]-1 == wptr_r[0+:ptr_width_lp]) || (cptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp]))
                & (cptr_r[ptr_width_lp] != wptr_r[ptr_width_lp]);
-  wire full_n = (cptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp])
+  wire full_n = ((cptr_n[0+:ptr_width_lp]-1 == wptr_n[0+:ptr_width_lp]) || (cptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp]))
                 & (cptr_n[ptr_width_lp] != wptr_n[ptr_width_lp]);
 
-//wrap around pointer for checkpoint to determine where we are in the queue
+  
+
   bsg_circular_ptr
    #(.slots_p(2*fe_queue_fifo_els_p), .max_add_p(1))
    cptr
@@ -99,7 +119,7 @@ module bp_be_issue_queue
      ,.o(cptr_r)
      ,.n_o(cptr_n)
      );
-//wrap around pointer for write and read
+
   bsg_circular_ptr
    #(.slots_p(2*fe_queue_fifo_els_p),.max_add_p(2*fe_queue_fifo_els_p-1))
    wptr
@@ -119,7 +139,8 @@ module bp_be_issue_queue
     ,.o(rptr_r)
     ,.n_o(rptr_n)
     );
-//read and write for FIFO queue
+  
+  /*
   bsg_mem_1r1w
   #(.width_p(fe_queue_width_lp), .els_p(fe_queue_fifo_els_p))
   queue_fifo_mem
@@ -132,18 +153,44 @@ module bp_be_issue_queue
     ,.r_addr_i(rptr_r[0+:ptr_width_lp])
     ,.r_data_o(fe_queue_cast_o)
     );
-  //queue is valid and ready
+  */
+
+  
+  // 2r2w queue_fifo_mem
+  bsg_mem_multiport
+  #(.width_p($bits(bp_be_issue_pkt_s)), 
+    .els_p(fe_queue_fifo_els_p), 
+    .read_ports_p(2), 
+    .write_ports_p(2))
+  queue_fifo_mem
+   (.w_clk_i(clk_i)
+    ,.w_reset_i(reset_i)
+
+    ,.w_v_i({enq1,enq2})
+    ,.w_addr_i({wptr1_r[0+:ptr_width_lp],wptr2_r[0+:ptr_width_lp]})
+    ,.w_data_i({fe_queue1_cast_i,fe_queue2_cast_i})
+
+    ,.r_v_i({(read & ~empty),(read & ~empty)})
+    ,.r_addr_i({rptr1_r[0+:ptr_width_lp],rptr2_r[0+:ptr_width_lp]})
+    ,.r_data_o({fe_queue1_cast_o,fe_queue2_cast_o})
+
+    );
+
+
   assign fe_queue_v_o     = ~roll & ~empty;
   assign fe_queue_ready_o = ~clr & ~full;
 
-  rv64_instr_fmatype_s instr;
-  assign instr = fe_queue_cast_i.msg.fetch.instr;
+  rv64_instr_fmatype_s instr1, instr2;
+  assign instr1 = fe_queue1_cast_i.msg.fetch.instr;
+  assign instr2 = fe_queue2_cast_i.msg.fetch.instr;
 
-  bp_be_issue_pkt_s issue_pkt_li, issue_pkt_lo;
-  wire issue_v = (fe_queue_yumi_i & ~empty_n) | roll_v_i | (fe_queue_v_i & empty);
-  wire bypass_reg = (wptr_r == rptr_n);
-  //issue_pkts come from fe_queue instr that have been ID'd as instr
-  //write issue packets and so they can be deployed
+  bp_be_issue_pkt_s issue_pkt1_li, issue_pkt1_lo, issue_pkt2_li, issue_pkt2_lo;
+  wire issue_v1 = (fe_queue_yumi1_i & ~empty_n) | roll_v_i | (fe_queue_v1_i & empty);
+  wire issue_v2 = (fe_queue_yumi2_i & ~empty_n) | roll_v_i | (fe_queue_v2_i & empty);
+  wire bypass_reg1 = (wptr1_r == rptr1_n);
+  wire bypass_reg2 = (wptr2_r == rptr2_n);
+  
+  /*
   bsg_mem_1r1w
   #(.width_p($bits(bp_be_issue_pkt_s)), .els_p(fe_queue_fifo_els_p), .read_write_same_addr_p(1))
   reg_fifo_mem
@@ -156,88 +203,184 @@ module bp_be_issue_queue
     ,.r_addr_i(rptr_n[0+:ptr_width_lp])
     ,.r_data_o(issue_pkt_lo)
     );
-  assign preissue_pkt_o = bypass_reg ? issue_pkt_li : issue_v ? issue_pkt_lo : '0;
-//packet issuing
+  */
+  
+
+  // 2r2w reg_fifo_mem
+  bsg_mem_multiport
+  #(.width_p($bits(bp_be_issue_pkt_s)), 
+    .els_p(fe_queue_fifo_els_p), 
+    .read_write_same_addr_p(1), 
+    .write_write_same_addr_p(1), 
+    .read_ports_p(2), 
+    .write_ports_p(2))
+  reg_fifo_mem
+   (.w_clk_i(clk_i)
+    ,.w_reset_i(reset_i)
+
+    ,.w_v_i({enq1,enq2})
+    ,.w_addr_i({wptr1_r[0+:ptr_width_lp],wptr2_r[0+:ptr_width_lp]})
+    ,.w_data_i({issue_pkt1_li,issue_pkt2_li})
+
+    ,.r_v_i({issue_v1,issue_v2})
+    ,.r_addr_i({rptr1_n[0+:ptr_width_lp],rptr2_n[0+:ptr_width_lp]})
+    ,.r_data_o({issue_pkt1_lo,issue_pkt2_lo})
+
+    );
+
+
+  assign preissue_pkt1_o = bypass_reg1 ? issue_pkt1_li : issue_v1 ? issue_pkt1_lo : '0;
+  assign preissue_pkt2_o = bypass_reg2 ? issue_pkt2_li : issue_v2 ? issue_pkt2_lo : '0;
+
   bsg_dff_reset_en
-   #(.width_p($bits(bp_be_issue_pkt_s)))
+   #(.width_p(2*$bits(bp_be_issue_pkt_s)))
    issue_reg
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
-     ,.en_i(issue_v)
-     ,.data_i(preissue_pkt_o)
-     ,.data_o(issue_pkt_o)
+     ,.en_i(issue_v1 | issue_v2)
+     ,.data_i({preissue_pkt1_o,preissue_pkt2_o})
+     ,.data_o({issue_pkt1_o,issue_pkt2_o})
      );
-//instruction decoding
+
+  
+
   always_comb
     begin
-      issue_pkt_li = '0;
+      issue_pkt1_li = '0;
 
-      // Pre-decode
-      issue_pkt_li.csr_v = instr.opcode inside {`RV64_SYSTEM_OP};
-      issue_pkt_li.mem_v = instr.opcode inside {`RV64_FLOAD_OP, `RV64_FSTORE_OP
+      // Pre-decode 1
+      issue_pkt1_li.csr_v = instr1.opcode inside {`RV64_SYSTEM_OP};
+      issue_pkt1_li.mem_v = instr1.opcode inside {`RV64_FLOAD_OP, `RV64_FSTORE_OP
                                                 ,`RV64_LOAD_OP, `RV64_STORE_OP
                                                 ,`RV64_AMO_OP, `RV64_SYSTEM_OP
                                                 };
-      issue_pkt_li.fence_v = instr inside {`RV64_FENCE, `RV64_FENCE_I, `RV64_SFENCE_VMA};
-      issue_pkt_li.long_v = instr inside {`RV64_DIV, `RV64_DIVU, `RV64_DIVW, `RV64_DIVUW
+      issue_pkt1_li.fence_v = instr1 inside {`RV64_FENCE, `RV64_FENCE_I, `RV64_SFENCE_VMA};
+      issue_pkt1_li.long_v = instr1 inside {`RV64_DIV, `RV64_DIVU, `RV64_DIVW, `RV64_DIVUW
+                                          ,`RV64_REM, `RV64_REMU, `RV64_REMW, `RV64_REMUW
+                                          ,`RV64_FDIV_S, `RV64_FDIV_D, `RV64_FSQRT_S, `RV64_FSQRT_D
+                                          };
+
+      issue_pkt1_li = '0;
+
+      // Pre-decode 2
+      issue_pkt2_li.csr_v = instr2.opcode inside {`RV64_SYSTEM_OP};
+      issue_pkt2_li.mem_v = instr2.opcode inside {`RV64_FLOAD_OP, `RV64_FSTORE_OP
+                                                ,`RV64_LOAD_OP, `RV64_STORE_OP
+                                                ,`RV64_AMO_OP, `RV64_SYSTEM_OP
+                                                };
+      issue_pkt2_li.fence_v = instr2 inside {`RV64_FENCE, `RV64_FENCE_I, `RV64_SFENCE_VMA};
+      issue_pkt2_li.long_v = instr2 inside {`RV64_DIV, `RV64_DIVU, `RV64_DIVW, `RV64_DIVUW
                                           ,`RV64_REM, `RV64_REMU, `RV64_REMW, `RV64_REMUW
                                           ,`RV64_FDIV_S, `RV64_FDIV_D, `RV64_FSQRT_S, `RV64_FSQRT_D
                                           };
 
       // Decide whether to read from integer regfile (saves power)
-      casez (instr.opcode)
+      casez (instr1.opcode)
         `RV64_JALR_OP, `RV64_LOAD_OP, `RV64_OP_IMM_OP, `RV64_OP_IMM_32_OP, `RV64_SYSTEM_OP :
           begin
-            issue_pkt_li.irs1_v = '1;
+            issue_pkt1_li.irs1_v = '1;
           end
         `RV64_BRANCH_OP, `RV64_STORE_OP, `RV64_OP_OP, `RV64_OP_32_OP, `RV64_AMO_OP:
           begin
-            issue_pkt_li.irs1_v = '1;
-            issue_pkt_li.irs2_v = '1;
+            issue_pkt1_li.irs1_v = '1;
+            issue_pkt1_li.irs2_v = '1;
           end
         `RV64_FLOAD_OP:
           begin
-            issue_pkt_li.irs1_v = 1'b1;
+            issue_pkt1_li.irs1_v = 1'b1;
           end
         `RV64_FSTORE_OP:
           begin
-            issue_pkt_li.irs1_v = 1'b1;
-            issue_pkt_li.frs2_v = 1'b1;
+            issue_pkt1_li.irs1_v = 1'b1;
+            issue_pkt1_li.frs2_v = 1'b1;
           end
         `RV64_FP_OP:
-          casez (instr)
+          casez (instr1)
             `RV64_FCVT_WS, `RV64_FCVT_WUS, `RV64_FCVT_LS, `RV64_FCVT_LUS
             ,`RV64_FCVT_WD, `RV64_FCVT_WUD, `RV64_FCVT_LD, `RV64_FCVT_LUD
             ,`RV64_FCVT_SD, `RV64_FCVT_DS
             ,`RV64_FMV_XW, `RV64_FMV_XD
             ,`RV64_FCLASS_S, `RV64_FCLASS_D:
               begin
-                issue_pkt_li.frs1_v = 1'b1;
+                issue_pkt1_li.frs1_v = 1'b1;
               end
             `RV64_FCVT_SW, `RV64_FCVT_SWU, `RV64_FCVT_SL, `RV64_FCVT_SLU
             ,`RV64_FCVT_DW, `RV64_FCVT_DWU, `RV64_FCVT_DL, `RV64_FCVT_DLU
             ,`RV64_FMV_WX, `RV64_FMV_DX:
               begin
-                issue_pkt_li.irs1_v = 1'b1;
+                issue_pkt1_li.irs1_v = 1'b1;
               end
             default:
               begin
-                issue_pkt_li.frs1_v = 1'b1;
-                issue_pkt_li.frs2_v = 1'b1;
+                issue_pkt1_li.frs1_v = 1'b1;
+                issue_pkt1_li.frs2_v = 1'b1;
               end
           endcase
         `RV64_FMADD_OP, `RV64_FMSUB_OP, `RV64_FNMSUB_OP, `RV64_FNMADD_OP:
           begin
-            issue_pkt_li.frs1_v = 1'b1;
-            issue_pkt_li.frs2_v = 1'b1;
-            issue_pkt_li.frs3_v = 1'b1;
+            issue_pkt1_li.frs1_v = 1'b1;
+            issue_pkt1_li.frs2_v = 1'b1;
+            issue_pkt1_li.frs3_v = 1'b1;
           end
         default: begin end
       endcase
 
-      issue_pkt_li.rs1_addr = instr.rs1_addr;
-      issue_pkt_li.rs2_addr = instr.rs2_addr;
-      issue_pkt_li.rs3_addr = instr.rs3_addr;
+      casez (instr2.opcode)
+        `RV64_JALR_OP, `RV64_LOAD_OP, `RV64_OP_IMM_OP, `RV64_OP_IMM_32_OP, `RV64_SYSTEM_OP :
+          begin
+            issue_pkt2_li.irs1_v = '1;
+          end
+        `RV64_BRANCH_OP, `RV64_STORE_OP, `RV64_OP_OP, `RV64_OP_32_OP, `RV64_AMO_OP:
+          begin
+            issue_pkt2_li.irs1_v = '1;
+            issue_pkt2_li.irs2_v = '1;
+          end
+        `RV64_FLOAD_OP:
+          begin
+            issue_pkt2_li.irs1_v = 1'b1;
+          end
+        `RV64_FSTORE_OP:
+          begin
+            issue_pkt2_li.irs1_v = 1'b1;
+            issue_pkt2_li.frs2_v = 1'b1;
+          end
+        `RV64_FP_OP:
+          casez (instr2)
+            `RV64_FCVT_WS, `RV64_FCVT_WUS, `RV64_FCVT_LS, `RV64_FCVT_LUS
+            ,`RV64_FCVT_WD, `RV64_FCVT_WUD, `RV64_FCVT_LD, `RV64_FCVT_LUD
+            ,`RV64_FCVT_SD, `RV64_FCVT_DS
+            ,`RV64_FMV_XW, `RV64_FMV_XD
+            ,`RV64_FCLASS_S, `RV64_FCLASS_D:
+              begin
+                issue_pkt2_li.frs1_v = 1'b1;
+              end
+            `RV64_FCVT_SW, `RV64_FCVT_SWU, `RV64_FCVT_SL, `RV64_FCVT_SLU
+            ,`RV64_FCVT_DW, `RV64_FCVT_DWU, `RV64_FCVT_DL, `RV64_FCVT_DLU
+            ,`RV64_FMV_WX, `RV64_FMV_DX:
+              begin
+                issue_pkt2_li.irs1_v = 1'b1;
+              end
+            default:
+              begin
+                issue_pkt2_li.frs1_v = 1'b1;
+                issue_pkt2_li.frs2_v = 1'b1;
+              end
+          endcase
+        `RV64_FMADD_OP, `RV64_FMSUB_OP, `RV64_FNMSUB_OP, `RV64_FNMADD_OP:
+          begin
+            issue_pkt2_li.frs1_v = 1'b1;
+            issue_pkt2_li.frs2_v = 1'b1;
+            issue_pkt2_li.frs3_v = 1'b1;
+          end
+        default: begin end
+      endcase
+
+      issue_pkt1_li.rs1_addr = instr1.rs1_addr;
+      issue_pkt1_li.rs2_addr = instr1.rs2_addr;
+      issue_pkt1_li.rs3_addr = instr1.rs3_addr;
+
+      issue_pkt2_li.rs1_addr = instr2.rs1_addr;
+      issue_pkt2_li.rs2_addr = instr2.rs2_addr;
+      issue_pkt2_li.rs3_addr = instr2.rs3_addr;
     end
 endmodule
-
