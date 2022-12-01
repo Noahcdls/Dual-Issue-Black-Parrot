@@ -150,7 +150,8 @@ module bp_be_pipe_sys
       retire_ninstr_r <= reservation.instr;
       retire_instr_r  <= retire_ninstr_r;
     end
-
+  //valid retire without exception
+  //I guess this is an instruction returns properly without exception
   wire instret_li = retire_v_i & ~|retire_exception_i;
   assign retire_pkt =
     '{v          : retire_v_i

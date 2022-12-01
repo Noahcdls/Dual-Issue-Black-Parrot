@@ -641,9 +641,11 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
     //double check on how to figure if we share metadata for exceptions or not
     if (fe_exception_v || fe_exception_v2)
       begin
+        fe_queue_cast_o1 = '0;
+        fe_queue_cast_o2 = '0;
         if(fe_exception_v) 
         begin
-          fe_queue_cast_o1 = '0;
+          // fe_queue_cast_o1 = '0;
           fe_queue_cast_o1.msg_type                     = e_fe_exception;
           fe_queue_cast_o1.msg.exception.vaddr          = fetch_pc_lo1;
           fe_queue_cast_o1.msg.exception.exception_code = itlb_miss_r
@@ -657,7 +659,7 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
                                                                    : e_icache_miss;
         end
         if(fe_exception_v2) begin
-          fe_queue_cast_o2 = '0;
+          // fe_queue_cast_o2 = '0;
           fe_queue_cast_o2.msg_type                     = e_fe_exception;
           fe_queue_cast_o2.msg.exception.vaddr          = fetch_pc_lo2;
           fe_queue_cast_o2.msg.exception.exception_code = itlb_miss_r2

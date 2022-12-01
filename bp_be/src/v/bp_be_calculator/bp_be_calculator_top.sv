@@ -54,8 +54,8 @@ module bp_be_calculator_top
 
   , output logic [commit_pkt_width_lp-1:0]          commit_pkt_o
   , output logic [branch_pkt_width_lp-1:0]          br_pkt_o
-  , output logic [wb_pkt_width_lp-1:0]              iwb_pkt_o
-  , output logic [wb_pkt_width_lp-1:0]              fwb_pkt_o
+  , output logic [wb_pkt_width_lp-1:0]              iwb_pkt_o, iwb_pkt_o2
+  , output logic [wb_pkt_width_lp-1:0]              fwb_pkt_o, fwb_pkt_o2
   , output logic [ptw_fill_pkt_width_lp-1:0]        ptw_fill_pkt_o
 
   , input                                           debug_irq_i
@@ -109,8 +109,14 @@ module bp_be_calculator_top
   bp_be_exc_stage_s      [pipe_stage_els_lp  :0] exc_stage_n;
   bp_be_exc_stage_s      [pipe_stage_els_lp-1:0] exc_stage_r;
 
-  bp_be_wb_pkt_s [pipe_stage_els_lp  :0] comp_stage_n;
-  bp_be_wb_pkt_s [pipe_stage_els_lp-1:0] comp_stage_r;
+  bp_be_exc_stage_s      [pipe_stage_els_lp  :0] exc_stage_n1;
+  bp_be_exc_stage_s      [pipe_stage_els_lp-1:0] exc_stage_r1;
+  bp_be_exc_stage_s      [pipe_stage_els_lp  :0] exc_stage_n2;
+  bp_be_exc_stage_s      [pipe_stage_els_lp-1:0] exc_stage_r2;
+
+  bp_be_wb_pkt_s [pipe_stage_els_lp  :0] comp_stage_n, comp_stage_n1, comp_stage_n2;
+
+  bp_be_wb_pkt_s [pipe_stage_els_lp-1:0] comp_stage_r, comp_stage_r1, comp_stage_r2;
 
   bp_be_ptw_fill_pkt_s ptw_fill_pkt;
   bp_be_trans_info_s   trans_info_lo;
@@ -142,9 +148,9 @@ module bp_be_calculator_top
   logic pipe_mem_late_fwb_pkt_v, pipe_mem_late_fwb_pkt_yumi;
 
   // Generating match vector for bypass
-  logic [2:0][pipe_stage_els_lp-1:0] match_rs;
-  logic [2:0][pipe_stage_els_lp-1:0] match2_rs;
-  logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data;
+  logic [2:0][pipe_stage_els_lp-1:0] match1_rs1, match1_rs2;
+  logic [2:0][pipe_stage_els_lp-1:0] match2_rs1, match2_rs2;
+  logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data1, forward_data2;
   for (genvar i = 0; i < pipe_stage_els_lp; i++)
     begin : forward_match
       // ?? also double match_rs to match_rs2
@@ -153,19 +159,38 @@ module bp_be_calculator_top
       //valid dispatch in queue and not fp and int write, and dispatch's fma rs addr is actively being computed
       //same for fp
       //tries to detect if upcoming fma instr are being written to and we need to wait
-      assign match_rs[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr))
-                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr));
-      assign match_rs[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr))
-                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs2_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr));
-      assign match_rs[2][i] = ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs3_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r[i].rd_addr));
+      assign match1_rs1[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)));
+      assign match1_rs1[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)));
+      assign match1_rs1[2][i] = ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs3_fp_v & (comp_stage_r1[i].frd_w_v)
+       & ((dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r1[i].rd_addr)));
 
-      assign match2_rs[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr))
-                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs1_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r[i].rd_addr));
-      assign match2_rs[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & comp_stage_r[i].ird_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr))
-                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs2_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r[i].rd_addr));
-      assign match2_rs[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & comp_stage_r[i].frd_w_v & (dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r[i].rd_addr));
+      assign match1_rs2[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)));
+      assign match1_rs2[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)));
+      assign match1_rs2[2][i] = ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs3_fp_v & (comp_stage_r2[i].frd_w_v)
+       & ((dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r2[i].rd_addr)));
 
-      assign forward_data[i] = comp_stage_n[i+1].rd_data;
+
+
+      assign match2_rs[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)));
+      assign match2_rs[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)));
+      assign match2_rs[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & (comp_stage_r1[i].frd_w_v)
+       & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r1[i].rd_addr)));
+
+      assign match2_rs[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)));
+      assign match2_rs[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)));
+      assign match2_rs[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & (comp_stage_r2[i].frd_w_v)
+       & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r2[i].rd_addr)));
+
+      assign forward_data1[i] = comp_stage_n1[i+1].rd_data;
+      assign forward_data2[i] = comp_stage_n2[i+1].rd_data;
     end
 
   logic [2:0][dpath_width_gp-1:0] bypass_rs;
@@ -175,37 +200,58 @@ module bp_be_calculator_top
   wire [2:0][dpath_width_gp-1:0] dispatch_data = {dispatch_pkt_cast_i.imm, dispatch_pkt_cast_i.rs2, dispatch_pkt_cast_i.rs1};
   for (genvar i = 0; i < 3; i++)
     begin : pencode
-      logic [pipe_stage_els_lp:0] match_rs_onehot;
-      logic [pipe_stage_els_lp:0] match2_rs_onehot;
+      logic [pipe_stage_els_lp:0] match1_rs1_onehot, match1_rs2_onehot;
+      logic [pipe_stage_els_lp:0] match2_rs1_onehot, match2_rs2_onehot;
+      logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data_final1, forward_data_final2;
+      //peform one hot encoding on elements to find where values are hidden
       bsg_priority_encode_one_hot_out
        #(.width_p(pipe_stage_els_lp+1), .lo_to_hi_p(1))
-       pencode_oh
-        (.i({1'b1, match_rs[i]})
-         ,.o(match_rs_onehot)
+       pencode1_oh1
+        (.i({1'b1, match1_rs1[i]})
+         ,.o(match1_rs1_onehot)
          ,.v_o()
          );
 
-      bsg_mux_one_hot
+      bsg_priority_encode_one_hot_out
+       #(.width_p(pipe_stage_els_lp+1), .lo_to_hi_p(1))
+       pencode1_oh2
+        (.i({1'b1, match1_rs2[i]})
+         ,.o(match1_rs2_onehot)
+         ,.v_o()
+         );
+
+      forward_data_final1 = (match1_rs1[i] != 0) ? forward_data1 : forward_data2;
+      logic match1_rs_onehot = (match1_rs1[i] != 0) ? match1_rs1_onehot : match1_rs2_onehot;
+      bsg_mux_one_hot1
        #(.width_p(dpath_width_gp), .els_p(pipe_stage_els_lp+1))
        fwd_mux_oh
-        (.data_i({dispatch_data[i], forward_data})
-         ,.sel_one_hot_i(match_rs_onehot)
+        (.data_i({dispatch_data[i], forward_data_final1})
+         ,.sel_one_hot_i(match1_rs_onehot)
          ,.data_o(bypass_rs[i])
          );
 
-      logic [pipe_stage_els_lp:0] match_rs_onehot;
-      bsg_priority_encode_one_hot_out
+     bsg_priority_encode_one_hot_out
        #(.width_p(pipe_stage_els_lp+1), .lo_to_hi_p(1))
-       pencode_oh2
-        (.i({1'b1, match2_rs[i]})
-         ,.o(match2_rs_onehot)
+       pencode2_oh1
+        (.i({1'b1, match2_rs1[i]})
+         ,.o(match2_rs1_onehot)
          ,.v_o()
          );
 
-      bsg_mux_one_hot
+      bsg_priority_encode_one_hot_out
+       #(.width_p(pipe_stage_els_lp+1), .lo_to_hi_p(1))
+       pencode2_oh2
+        (.i({1'b1, match2_rs2[i]})
+         ,.o(match2_rs2_onehot)
+         ,.v_o()
+         );
+
+      forward_data_final2 = (match2_rs1[i] != 0) ? forward_data1 : forward_data2;
+      logic match2_rs_onehot = (match2_rs1[i] != 0) ? match2_rs1_onehot : match2_rs2_onehot;
+      bsg_mux_one_hot2
        #(.width_p(dpath_width_gp), .els_p(pipe_stage_els_lp+1))
-       fwd_mux_oh2
-        (.data_i({dispatch_data2[i], forward_data})
+       fwd_mux_oh
+        (.data_i({dispatch_data2[i], forward_data_final2})
          ,.sel_one_hot_i(match2_rs_onehot)
          ,.data_o(bypass2_rs[i])
          );
@@ -231,13 +277,13 @@ module bp_be_calculator_top
       reservation_n_2.rs2    = bypass2_rs[1];
       reservation_n_2.imm    = bypass2_rs[2];
     end
-  wire ctl_reservation = reservation_r_1.decode.pipe_ctl ? reservation_r_1 : reservation_r_2;
-  wire sys_reservation = reservation_r_1.decode.pipe_sys ? reservation_r_1 : reservation_r_2;
-  wire int_reservation = reservation_r_1.decode.pipe_int ? reservation_r_1 : reservation_r_2;
-  wire aux_reservation = reservation_r_1.decode.pipe_aux ? reservation_r_1 : reservation_r_2;
-  wire mem_reservation = reservation_r_1.decode.pipe_mem ? reservation_r_1 : reservation_r_2;
-  wire fma_reservation = reservation_r_1.decode.pipe_fma ? reservation_r_1 : reservation_r_2;
-  wire long_reservation = reservation_r_1.decode.pipe_long ? reservation_r_1 : reservation_r_2;
+  wire ctl_reservation = reservation_r_1.decode.pipe_ctl_v ? reservation_r_1 : reservation_r_2;
+  wire sys_reservation = reservation_r_1.decode.pipe_sys_v ? reservation_r_1 : reservation_r_2;
+  wire int_reservation = reservation_r_1.decode.pipe_int_v ? reservation_r_1 : reservation_r_2;
+  wire aux_reservation = reservation_r_1.decode.pipe_aux_v ? reservation_r_1 : reservation_r_2;
+  wire mem_reservation = (reservation_r_1.decode.pipe_mem_early_v || reservation_r_1.decode.pipe_mem_final_v)  ? reservation_r_1 : reservation_r_2;
+  wire fma_reservation = (reservation_r_1.decode.pipe_fma_v || reservation_r_1.decode.pipe_mul_v) ? reservation_r_1 : reservation_r_2;
+  wire long_reservation = reservation_r_1.decode.pipe_long_v ? reservation_r_1 : reservation_r_2;
   //?? wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
   wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
   wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
@@ -511,17 +557,158 @@ module bp_be_calculator_top
       comp_stage_n[2].fflags_w_v &= exc_stage_n[2].v;
       comp_stage_n[3].fflags_w_v &= exc_stage_n[3].v;
 
-      // Inject D$ miss so we don't accidentally write back the data
+      // writeback to reg if dcache didnt miss
       comp_stage_n[2].ird_w_v    &= ~pipe_mem_dcache_miss_lo;
       comp_stage_n[2].frd_w_v    &= ~pipe_mem_dcache_miss_lo;
     end
-
+  
   bsg_dff
    #(.width_p($bits(bp_be_wb_pkt_s)*pipe_stage_els_lp))
    comp_stage_reg
     (.clk_i(clk_i)
      ,.data_i(comp_stage_n[0+:pipe_stage_els_lp])
      ,.data_o(comp_stage_r)
+     );
+
+
+  bp_be_dispatch_pkt_s [pipe_stage_els_lp-1:0] comp_stage_pkt1;
+  always_comb
+    begin
+      for (integer i = 0; i <= pipe_stage_els_lp; i++)
+        begin : comp_stage1
+          // Normally, shift down in the pipe
+          //integer reg file
+          //floating reg file
+          //so this is for R type function which is register functions with two regs and a destination
+          // comp_stage_pkt1[i] = (1==0) ? reservation_n_1 : comp_stage_pkt1[i-1];
+          comp_stage_n1[i] = (i == 0)
+            ? '{ird_w_v    : reservation_n_1.decode.irf_w_v
+                ,frd_w_v   : reservation_n_1.decode.frf_w_v
+                ,fflags_w_v: reservation_n_1.decode.fflags_w_v
+                ,rd_addr   : reservation_n_1.instr.t.rtype.rd_addr
+                ,default: '0
+                }
+            : comp_stage_r1[i-1];
+        end
+      // Injected instructions can carry a payload in rs2
+      comp_stage_n1[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : '0;
+      comp_stage_n1[1].rd_data    |= (pipe_int_data_lo_v & comp_stage_pkt1[1].decode.pipe_int_v)       ? pipe_int_data_lo         : '0;
+      comp_stage_n1[1].rd_data    |= (pipe_ctl_data_lo_v & comp_stage_pkt1[1].decode.pipe_ctl_v)     ? pipe_ctl_data_lo         : '0;
+      comp_stage_n1[1].rd_data    |= (pipe_sys_data_lo_v & comp_stage_pkt1[1].decode.pipe_sys_v)       ? pipe_sys_data_lo         : '0;
+      comp_stage_n1[2].rd_data    |= (pipe_mem_early_data_lo_v & comp_stage_pkt1[2].decode.pipe_mem_early_v) ? pipe_mem_early_data_lo   : '0;
+      comp_stage_n1[2].rd_data    |= (pipe_aux_data_lo_v & comp_stage_pkt1[2].decode.pipe_aux_v)      ? pipe_aux_data_lo         : '0;
+      comp_stage_n1[3].rd_data    |= (pipe_mem_final_data_lo_v & comp_stage_pkt1[3].decode.pipe_mem_final_v) ? pipe_mem_final_data_lo   : '0;
+      comp_stage_n1[3].rd_data    |= (pipe_mul_data_lo_v & comp_stage_pkt1[3].decode.pipe_mul_v)      ? pipe_mul_data_lo         : '0;
+      comp_stage_n1[4].rd_data    |= (pipe_fma_data_lo_v & comp_stage_pkt1[4].decode.pipe_fma_v)       ? pipe_fma_data_lo         : '0;
+
+      comp_stage_n1[2].fflags     |= (pipe_mem_early_data_lo_v & comp_stage_pkt1[2].decode.pipe_mem_early_v) ? pipe_mem_early_fflags_lo : '0;
+      comp_stage_n1[2].fflags     |= (pipe_aux_data_lo_v & comp_stage_pkt1[2].decode.pipe_aux_v)       ? pipe_aux_fflags_lo       : '0;
+      comp_stage_n1[4].fflags     |= (pipe_fma_data_lo_v & comp_stage_pkt1[4].decode.pipe_fma_v)       ? pipe_fma_fflags_lo       : '0;
+
+      comp_stage_n1[0].ird_w_v    &= exc_stage_n1[0].v;
+      comp_stage_n1[1].ird_w_v    &= exc_stage_n1[1].v;
+      comp_stage_n1[2].ird_w_v    &= exc_stage_n1[2].v;
+      comp_stage_n1[3].ird_w_v    &= exc_stage_n1[3].v;
+
+      comp_stage_n1[0].frd_w_v    &= exc_stage_n1[0].v;
+      comp_stage_n1[1].frd_w_v    &= exc_stage_n1[1].v;
+      comp_stage_n1[2].frd_w_v    &= exc_stage_n1[2].v;
+      comp_stage_n1[3].frd_w_v    &= exc_stage_n1[3].v;
+
+      comp_stage_n1[0].fflags_w_v &= exc_stage_n1[0].v;
+      comp_stage_n1[1].fflags_w_v &= exc_stage_n1[1].v;
+      comp_stage_n1[2].fflags_w_v &= exc_stage_n1[2].v;
+      comp_stage_n1[3].fflags_w_v &= exc_stage_n1[3].v;
+
+      // writeback to reg if dcache didnt miss
+      comp_stage_n1[2].ird_w_v    &= (~pipe_mem_dcache_miss_lo & (comp_stage_pkt1[2].decode.pipe_mem_early_v | comp_stage_pkt1[2].decode.pipe_mem_final_v));
+      comp_stage_n1[2].frd_w_v    &= (~pipe_mem_dcache_miss_lo & (comp_stage_pkt1[2].decode.pipe_mem_early_v | comp_stage_pkt1[2].decode.pipe_mem_final_v));
+    end
+
+// assign comp_stage_pkt1[0] = reservation_n_1;
+  bsg_dff
+   #(.width_p($bits(bp_be_dispatch_pkt_s)*(pipe_stage_els_lp-1)))
+   comp_stage_pktreg1
+    (.clk_i(clk_i)
+     ,.data_i({comp_stage_pkt1[3], comp_stage_pkt1[2], comp_stage_pkt1[1], reservation_n_1})
+     ,.data_o({comp_stage_pkt1[4], comp_stage_pkt1[3], comp_stage_pkt1[2], comp_stage_pkt1[1]})
+     );
+
+  bsg_dff
+   #(.width_p($bits(bp_be_wb_pkt_s)*pipe_stage_els_lp))
+   comp_stage_reg1
+    (.clk_i(clk_i)
+     ,.data_i(comp_stage_n1[0+:pipe_stage_els_lp])
+     ,.data_o(comp_stage_r1)
+     );
+
+  bp_be_dispatch_pkt_s [pipe_stage_els_lp-1:0] comp_stage_pkt2;
+  always_comb
+    begin
+      for (integer i = 0; i <= pipe_stage_els_lp; i++)
+        begin : comp_stage2
+          // Normally, shift down in the pipe
+          //integer reg file
+          //floating reg file
+          //so this is for R type function which is register functions with two regs and a destination
+          // comp_stage_pkt2[i] = (1==0) ? reservation_n_2 : comp_stage_pkt2[i-1];
+          comp_stage_n2[i] = (i == 0)
+            ? '{ird_w_v    : reservation_n_2.decode.irf_w_v
+                ,frd_w_v   : reservation_n_2.decode.frf_w_v
+                ,fflags_w_v: reservation_n_2.decode.fflags_w_v
+                ,rd_addr   : reservation_n_2.instr.t.rtype.rd_addr
+                ,default: '0
+                }
+            : comp_stage_r2[i-1];
+        end
+      // Injected instructions can carry a payload in rs2
+      comp_stage_n2[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : '0;
+      comp_stage_n2[1].rd_data    |= (pipe_int_data_lo_v & comp_stage_pkt2[1].decode.pipe_int_v)       ? pipe_int_data_lo         : '0;
+      comp_stage_n2[1].rd_data    |= (pipe_ctl_data_lo_v & comp_stage_pkt2[1].decode.pipe_ctl_v)     ? pipe_ctl_data_lo         : '0;
+      comp_stage_n2[1].rd_data    |= (pipe_sys_data_lo_v & comp_stage_pkt2[1].decode.pipe_sys_v)       ? pipe_sys_data_lo         : '0;
+      comp_stage_n2[2].rd_data    |= (pipe_mem_early_data_lo_v & comp_stage_pkt2[2].decode.pipe_mem_early_v) ? pipe_mem_early_data_lo   : '0;
+      comp_stage_n2[2].rd_data    |= (pipe_aux_data_lo_v & comp_stage_pkt2[2].decode.pipe_aux_v)      ? pipe_aux_data_lo         : '0;
+      comp_stage_n2[3].rd_data    |= (pipe_mem_final_data_lo_v & comp_stage_pkt2[3].decode.pipe_mem_final_v) ? pipe_mem_final_data_lo   : '0;
+      comp_stage_n2[3].rd_data    |= (pipe_mul_data_lo_v & comp_stage_pkt2[3].decode.pipe_mul_v)      ? pipe_mul_data_lo         : '0;
+      comp_stage_n2[4].rd_data    |= (pipe_fma_data_lo_v & comp_stage_pkt2[4].decode.pipe_fma_v)       ? pipe_fma_data_lo         : '0;
+
+      comp_stage_n2[2].fflags     |= (pipe_mem_early_data_lo_v & comp_stage_pkt2[2].decode.pipe_mem_early_v) ? pipe_mem_early_fflags_lo : '0;
+      comp_stage_n2[2].fflags     |= (pipe_aux_data_lo_v & comp_stage_pkt2[2].decode.pipe_aux_v)       ? pipe_aux_fflags_lo       : '0;
+      comp_stage_n2[4].fflags     |= (pipe_fma_data_lo_v & comp_stage_pkt2[4].decode.pipe_fma_v)       ? pipe_fma_fflags_lo       : '0;
+
+      comp_stage_n2[0].ird_w_v    &= exc_stage_n2[0].v;
+      comp_stage_n2[1].ird_w_v    &= exc_stage_n2[1].v;
+      comp_stage_n2[2].ird_w_v    &= exc_stage_n2[2].v;
+      comp_stage_n2[3].ird_w_v    &= exc_stage_n2[3].v;
+
+      comp_stage_n2[0].frd_w_v    &= exc_stage_n2[0].v;
+      comp_stage_n2[1].frd_w_v    &= exc_stage_n2[1].v;
+      comp_stage_n2[2].frd_w_v    &= exc_stage_n2[2].v;
+      comp_stage_n2[3].frd_w_v    &= exc_stage_n2[3].v;
+
+      comp_stage_n2[0].fflags_w_v &= exc_stage_n2[0].v;
+      comp_stage_n2[1].fflags_w_v &= exc_stage_n2[1].v;
+      comp_stage_n2[2].fflags_w_v &= exc_stage_n2[2].v;
+      comp_stage_n2[3].fflags_w_v &= exc_stage_n2[3].v;
+
+      // writeback to reg if dcache didnt miss
+      comp_stage_n2[2].ird_w_v    &= (~pipe_mem_dcache_miss_lo & (comp_stage_pkt2[2].decode.pipe_mem_early_v | comp_stage_pkt2[2].decode.pipe_mem_final_v));
+      comp_stage_n2[2].frd_w_v    &= (~pipe_mem_dcache_miss_lo & (comp_stage_pkt2[2].decode.pipe_mem_early_v | comp_stage_pkt2[2].decode.pipe_mem_final_v));
+    end
+
+  bsg_dff
+   #(.width_p($bits(bp_be_wb_pkt_s)*pipe_stage_els_lp))
+   comp_stage_reg2
+    (.clk_i(clk_i)
+     ,.data_i(comp_stage_n2[0+:pipe_stage_els_lp])
+     ,.data_o(comp_stage_r2)
+     );
+  bsg_dff
+   #(.width_p($bits(bp_be_dispatch_pkt_s)*(pipe_stage_els_lp-1)))
+   comp_stage_pktreg2
+    (.clk_i(clk_i)
+     ,.data_i({comp_stage_pkt2[3], comp_stage_pkt2[2], comp_stage_pkt2[1], reservation_n_2})
+     ,.data_o({comp_stage_pkt2[4], comp_stage_pkt2[3], comp_stage_pkt2[2], comp_stage_pkt2[1]})
      );
 
   always_comb
@@ -548,8 +735,8 @@ module bp_be_calculator_top
           exc_stage_n[0].spec                   |= (reservation_n_1.special | reservation_n_2.special);
           exc_stage_n[0].exc                    |= (reservation_n_1.exception | reservation_n_2.exception);
 
-          exc_stage_n[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo;
-          exc_stage_n[1].spec.csrw              |= pipe_sys_csrw_lo;
+          exc_stage_n[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo1;
+          exc_stage_n[1].spec.csrw              |= pipe_sys_csrw_lo & comp_stage_n1;
 
           exc_stage_n[1].exc.dtlb_store_miss    |= pipe_mem_dtlb_store_miss_lo;
           exc_stage_n[1].exc.dtlb_load_miss     |= pipe_mem_dtlb_load_miss_lo;
@@ -576,13 +763,125 @@ module bp_be_calculator_top
      ,.data_o(exc_stage_r)
      );
 
-  assign pipe_mem_late_iwb_pkt_yumi = pipe_mem_late_iwb_pkt_v & ~comp_stage_r[3].ird_w_v;
-  assign pipe_mem_late_fwb_pkt_yumi = pipe_mem_late_fwb_pkt_v & ~comp_stage_r[4].frd_w_v;
 
-  assign pipe_long_idata_lo_yumi = pipe_long_idata_lo_v & ~pipe_mem_late_iwb_pkt_v & ~comp_stage_r[3].ird_w_v;
-  assign pipe_long_fdata_lo_yumi = pipe_long_fdata_lo_v & ~pipe_mem_late_fwb_pkt_v & ~comp_stage_r[4].frd_w_v & ~comp_stage_r[4].fflags_w_v;
+  always_comb
+    begin
+      // Exception aggregation
+      for (integer i = 0; i <= pipe_stage_els_lp; i++)
+        begin : exc_stage1
+          // Normally, shift down in the pipe
+          exc_stage_n1[i] = (i == 0) ? '0 : exc_stage_r[i-1];
+        end
+          //no npc writes from bad branching or csr states and none from reservation
+          exc_stage_n1[0].v                       = reservation_n_1.v;
+          exc_stage_n1[0].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[1].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[2].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          //after instr is all done that the instr returns properly
+          exc_stage_n1[3].v                      &= commit_pkt1_cast_o.instret;
+          //reservation is indeed queued so it can be saved and returned
+          exc_stage_n1[0].queue_v                 = reservation_n_1.queue_v;
+          exc_stage_n1[0].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[1].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[2].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[3].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
 
-  assign iwb_pkt_o = pipe_mem_late_iwb_pkt_yumi ? pipe_mem_late_iwb_pkt : pipe_long_idata_lo_yumi ? long_iwb_pkt : comp_stage_r[3];
-  assign fwb_pkt_o = pipe_mem_late_fwb_pkt_yumi ? pipe_mem_late_fwb_pkt : pipe_long_fdata_lo_yumi ? long_fwb_pkt : comp_stage_r[4];
+          //special and exception hold a bits for particular cases that we might as well combine
+          exc_stage_n1[0].spec                   |= (reservation_n_1.special);
+          exc_stage_n1[0].exc                    |= (reservation_n_1.exception);
+          //csr exceptions occur if they are legit inputs to pipe_sys_v since they need te be valid in csr of pipe_sys
+          exc_stage_n1[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo & comp_stage_pkt1[1].decode.pipe_sys_v;
+          exc_stage_n1[1].spec.csrw              |= pipe_sys_csrw_lo & comp_stage_pkt1[1].decode.pipe_sys_v;
+          //memory related exceptions which we need to pass our pkt to
+          exc_stage_n1[1].exc.dtlb_store_miss    |= pipe_mem_dtlb_store_miss_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.dtlb_load_miss     |= pipe_mem_dtlb_load_miss_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.load_misaligned    |= pipe_mem_load_misaligned_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.load_access_fault  |= pipe_mem_load_access_fault_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.load_page_fault    |= pipe_mem_load_page_fault_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.store_misaligned   |= pipe_mem_store_misaligned_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.store_access_fault |= pipe_mem_store_access_fault_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+          exc_stage_n1[1].exc.store_page_fault   |= pipe_mem_store_page_fault_lo & (comp_stage_pkt1[1].decode.pipe_mem_early_v ||  comp_stage_pkt1[1].decode.pipe_mem_final_v);
+
+          exc_stage_n1[2].exc.dcache_fail        |= pipe_mem_dcache_fail_lo & (comp_stage_pkt1[2].decode.pipe_mem_early_v ||  comp_stage_pkt1[2].decode.pipe_mem_final_v);
+          exc_stage_n1[2].spec.dcache_miss       |= pipe_mem_dcache_miss_lo & (comp_stage_pkt1[2].decode.pipe_mem_early_v ||  comp_stage_pkt1[2].decode.pipe_mem_final_v);
+          exc_stage_n1[2].spec.fencei_clean      |= pipe_mem_fencei_clean_lo & (comp_stage_pkt1[2].decode.pipe_mem_early_v ||  comp_stage_pkt1[2].decode.pipe_mem_final_v);
+          exc_stage_n1[2].exc.fencei_dirty       |= pipe_mem_fencei_dirty_lo & (comp_stage_pkt1[2].decode.pipe_mem_early_v ||  comp_stage_pkt1[2].decode.pipe_mem_final_v);
+          exc_stage_n1[2].exc.cmd_full           |= |{exc_stage_r1[2].exc, exc_stage_r1[2].spec} & cmd_full_n_i;
+    end
+
+  // Exception pipeline 1
+  bsg_dff
+   #(.width_p($bits(bp_be_exc_stage_s)*pipe_stage_els_lp))
+   exc_stage_reg1
+    (.clk_i(clk_i)
+     ,.data_i(exc_stage_n1[0+:pipe_stage_els_lp])
+     ,.data_o(exc_stage_r1)
+     );
+
+  always_comb
+    begin
+      // Exception aggregation
+      for (integer i = 0; i <= pipe_stage_els_lp; i++)
+        begin : exc_stage1
+          // Normally, shift down in the pipe
+          exc_stage_n1[i] = (i == 0) ? '0 : exc_stage_r[i-1];
+        end
+          exc_stage_n2[0].v                       = reservation_n_2.v;
+          exc_stage_n2[0].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[1].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[2].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[3].v                      &= commit_pkt2_cast_o.instret;
+
+          exc_stage_n2[0].queue_v                 = reservation_n_2.queue_v;
+          exc_stage_n2[0].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[1].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[2].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[3].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+
+          //special and exception hold a bits for particular cases that we might as well combine
+          exc_stage_n2[0].spec                   |= (reservation_n_2.special);
+          exc_stage_n2[0].exc                    |= (reservation_n_2.exception);
+          //csr exceptions occur if they are legit inputs to pipe_sys_v since they need te be valid in csr of pipe_sys
+          exc_stage_n2[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo & comp_stage_pkt2[1].decode.pipe_sys_v;
+          exc_stage_n2[1].spec.csrw              |= pipe_sys_csrw_lo & comp_stage_pkt2[1].decode.pipe_sys_v;
+          //memory related exceptions which we need to pass our pkt to
+          exc_stage_n2[1].exc.dtlb_store_miss    |= pipe_mem_dtlb_store_miss_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.dtlb_load_miss     |= pipe_mem_dtlb_load_miss_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.load_misaligned    |= pipe_mem_load_misaligned_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.load_access_fault  |= pipe_mem_load_access_fault_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.load_page_fault    |= pipe_mem_load_page_fault_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.store_misaligned   |= pipe_mem_store_misaligned_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.store_access_fault |= pipe_mem_store_access_fault_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+          exc_stage_n2[1].exc.store_page_fault   |= pipe_mem_store_page_fault_lo & (comp_stage_pkt2[1].decode.pipe_mem_early_v ||  comp_stage_pkt2[1].decode.pipe_mem_final_v);
+
+          exc_stage_n2[2].exc.dcache_fail        |= pipe_mem_dcache_fail_lo & (comp_stage_pkt2[2].decode.pipe_mem_early_v ||  comp_stage_pkt2[2].decode.pipe_mem_final_v);
+          exc_stage_n2[2].spec.dcache_miss       |= pipe_mem_dcache_miss_lo & (comp_stage_pkt2[2].decode.pipe_mem_early_v ||  comp_stage_pkt2[2].decode.pipe_mem_final_v);
+          exc_stage_n2[2].spec.fencei_clean      |= pipe_mem_fencei_clean_lo & (comp_stage_pkt2[2].decode.pipe_mem_early_v ||  comp_stage_pkt2[2].decode.pipe_mem_final_v);
+          exc_stage_n2[2].exc.fencei_dirty       |= pipe_mem_fencei_dirty_lo & (comp_stage_pkt2[2].decode.pipe_mem_early_v ||  comp_stage_pkt2[2].decode.pipe_mem_final_v);
+          exc_stage_n2[2].exc.cmd_full           |= |{exc_stage_r2[2].exc, exc_stage_r2[2].spec} & cmd_full_n_i;
+    end
+
+  // Exception pipeline 2
+  bsg_dff
+   #(.width_p($bits(bp_be_exc_stage_s)*pipe_stage_els_lp))
+   exc_stage_reg2
+    (.clk_i(clk_i)
+     ,.data_i(exc_stage_n2[0+:pipe_stage_els_lp])
+     ,.data_o(exc_stage_r2)
+     );
+
+
+
+
+  assign pipe_mem_late_iwb_pkt_yumi = pipe_mem_late_iwb_pkt_v & (~comp_stage_r1[3].ird_w_v || ~comp_stage_r2[3].ird_w_v);
+  assign pipe_mem_late_fwb_pkt_yumi = pipe_mem_late_fwb_pkt_v & (~comp_stage_r1[4].frd_w_v || ~comp_stage_r2[4].frd_w_v);
+
+  assign pipe_long_idata_lo_yumi = pipe_long_idata_lo_v & ~pipe_mem_late_iwb_pkt_v & (~comp_stage_r1[3].ird_w_v || ~comp_stage_r2[3].ird_w_v);
+  assign pipe_long_fdata_lo_yumi = pipe_long_fdata_lo_v & ~pipe_mem_late_fwb_pkt_v & ((~comp_stage_r1[4].frd_w_v & ~comp_stage_r1[4].fflags_w_v) || (~comp_stage_r2[4].frd_w_v & ~comp_stage_r2[4].fflags_w_v));
+
+  assign iwb_pkt_o = (pipe_mem_late_iwb_pkt_yumi & ~comp_stage_r1[3].ird_w_v) ? pipe_mem_late_iwb_pkt : (pipe_long_idata_lo_yumi & (~comp_stage_r1[4].frd_w_v & ~comp_stage_r1[4].fflags_w_v)) ? long_iwb_pkt : comp_stage_r1[3];
+  assign iwb_pkt_o2 = (pipe_mem_late_iwb_pkt_yumi & ~comp_stage_r2[3].ird_w_v) ? pipe_mem_late_iwb_pkt : (pipe_long_idata_lo_yumi & (~comp_stage_r2[4].frd_w_v & ~comp_stage_r2[4].fflags_w_v)) ? long_iwb_pkt : comp_stage_r2[3];
+  assign fwb_pkt_o = (pipe_mem_late_fwb_pkt_yumi & ~comp_stage_r1[4].frd_w_v) ? pipe_mem_late_fwb_pkt : (pipe_long_fdata_lo_yumi & (~comp_stage_r1[4].frd_w_v & ~comp_stage_r1[4].fflags_w_v)) ? long_fwb_pkt : comp_stage_r1[4];
+  assign fwb_pkt_o2 = (pipe_mem_late_fwb_pkt_yumi & ~comp_stage_r2[4].frd_w_v) ? pipe_mem_late_fwb_pkt : (pipe_long_fdata_lo_yumi & (~comp_stage_r2[4].frd_w_v & ~comp_stage_r2[4].fflags_w_v)) ? long_fwb_pkt : comp_stage_r2[4];
 
 endmodule
