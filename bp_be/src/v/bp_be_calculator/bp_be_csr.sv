@@ -32,6 +32,7 @@ module bp_be_csr
    // Misc interface
    , input [retire_pkt_width_lp-1:0]         retire_pkt_i
    , input rv64_fflags_s                     fflags_acc_i
+   //this input is connected to nothing
    , input                                   frf_w_v_i
 
    // Interrupts
@@ -696,6 +697,7 @@ module bp_be_csr
   assign commit_pkt_cast_o.dtlb_load_miss   = retire_pkt_cast_i.exception.dtlb_load_miss;
   assign commit_pkt_cast_o.dcache_fail      = retire_pkt_cast_i.exception.dcache_fail;
   assign commit_pkt_cast_o.dcache_miss      = retire_pkt_cast_i.special.dcache_miss;
+  //need to differentiate data points to determine proper pte according to type of fills
   assign commit_pkt_cast_o.itlb_fill_v      = retire_pkt_cast_i.exception.itlb_fill;
   assign commit_pkt_cast_o.dtlb_fill_v      = retire_pkt_cast_i.exception.dtlb_fill;
 

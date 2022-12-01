@@ -52,7 +52,7 @@ module bp_be_calculator_top
   , output logic [decode_info_width_lp-1:0]         decode_info_o
   , input                                           cmd_full_n_i
 
-  , output logic [commit_pkt_width_lp-1:0]          commit_pkt_o
+  , output logic [commit_pkt_width_lp-1:0]          commit_pkt_o, commit_pkt2_o
   , output logic [branch_pkt_width_lp-1:0]          br_pkt_o
   , output logic [wb_pkt_width_lp-1:0]              iwb_pkt_o, iwb_pkt_o2
   , output logic [wb_pkt_width_lp-1:0]              fwb_pkt_o, fwb_pkt_o2
@@ -103,6 +103,7 @@ module bp_be_calculator_top
   // ?? is this correct
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2);
   `bp_cast_o(bp_be_commit_pkt_s, commit_pkt);
+  `bp_cast_o(bp_be_commit_pkt_s, commit_pkt2);
 
 
   // Pipeline stage registers
@@ -332,14 +333,22 @@ module bp_be_calculator_top
      ,.reservation_i(sys_reservation)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
-     ,.retire_v_i(exc_stage_r[2].v)
-     ,.retire_queue_v_i(exc_stage_r[2].queue_v)
-     ,.retire_data_i(comp_stage_r[2].rd_data)
-     ,.retire_exception_i(exc_stage_r[2].exc)
-     ,.retire_special_i(exc_stage_r[2].spec)
+     ,.retire_v_i(exc_stage_r1[2].v)
+     ,.retire_v_i2(exc_stage_r2[2].v)
+     ,.retire_queue_v_i(exc_stage_r1[2].queue_v)
+     ,.retire_queue_v_i2(exc_stage_r2[2].queue_v)
+     ,.retire_data_i(comp_stage_r1[2].rd_data)
+     ,.retire_data_i2(comp_stage_r2[2].rd_data)
+     ,.retire_exception_i(exc_stage_r1[2].exc)
+     ,.retire_exception_i2(exc_stage_r2[2].exc)
+     ,.retire_special_i(exc_stage_r1[2].spec)
+     ,.retire_special_i2(exc_stage_r2[2].spec)
      ,.commit_pkt_o(commit_pkt_cast_o)
+     ,.commit_pkt_o2(commit_pkt2_cast_o)
      ,.iwb_pkt_i(iwb_pkt_o)
      ,.fwb_pkt_i(fwb_pkt_o)
+     ,.iwb_pkt_i2(iwb_pkt_o2)
+     ,.fwb_pkt_i2(fwb_pkt_o2)
 
      ,.debug_irq_i(debug_irq_i)
      ,.timer_irq_i(timer_irq_i)
