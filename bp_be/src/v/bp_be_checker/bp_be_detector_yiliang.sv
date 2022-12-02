@@ -40,14 +40,10 @@ module bp_be_detector
    , input [cfg_bus_width_lp-1:0]      cfg_bus_i
 
    // Dependency information
-      // from scheduler
-   , input [isd_status_width_lp-1:0]   isd_status1_i, isd_status2_i
-      // from director
+   , input [isd_status_width_lp-1:0]   isd_status_i, isd_status2_i
    , input                             cmd_full_i
-      // BE input
    , input                             credits_full_i
    , input                             credits_empty_i
-      // from calculator
    , input                             idiv_ready_i
    , input                             fdiv_ready_i
    , input                             mem_ready_i
@@ -55,29 +51,28 @@ module bp_be_detector
    , input                             irq_pending_i
 
    // Pipeline control signals from the checker to the calculator
-      // to scheduler
-   , output logic                      dispatch_v1_o, dispatch_v2_o
-   , output logic                      interrupt_v_o // interrupt_v_o = irq_pending_i & ~ptw_busy_i;
-      // from scheduler
-      // DOUBLE DISPATCH PACKETS - NOAH
-   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i, dispatch_pkt2_i// used to extract source reg info
-      // from calculator
-   , input [commit_pkt_width_lp-1:0]   commit_pkt_i // used to extract dest. reg info
-   , input [wb_pkt_width_lp-1:0]       iwb_pkt_i
-   , input [wb_pkt_width_lp-1:0]       fwb_pkt_i
+   , output logic                      dispatch_v_o, dispatch_v_o2//we can send the dispatch out
+   , output logic                      interrupt_v_o//interrupt to stop sys
+   , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i, dispatch_pkt2_i
+   , input [commit_pkt_width_lp-1:0]   commit_pkt_i, commit_pkt2_i//commits
+   , input [wb_pkt_width_lp-1:0]       iwb_pkt_i, iwb_pkt2_i //writeback for int
+   , input [wb_pkt_width_lp-1:0]       fwb_pkt_i, fwb_pkt2_i//floating writeback
    );
 
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
   `declare_bp_be_internal_if_structs(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
-  `bp_cast_i(bp_be_isd_status_s, isd_status1);
+  `bp_cast_i(bp_be_isd_status_s, isd_status);
   `bp_cast_i(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
-  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2);
+  `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2)
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
+  `bp_cast_i(bp_be_commit_pkt_s, commit_pkt2);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt);
+  `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt2);
+  `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt2);
 
   // Integer data hazards
   logic irs1_sb_raw_haz1_v, irs2_sb_raw_haz1_v;
@@ -105,9 +100,13 @@ module bp_be_detector
 
   wire [reg_addr_width_gp-1:0] score_rd_li  = commit_pkt_cast_i.dcache_miss
     ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
+    : commit_pkt2_cast_i.dcache_miss
+    ? commit_pkt2_cast_i.instr.t.fmatype.rd_addr
     : dispatch_pkt_cast_i.instr.t.fmatype.rd_addr;
   wire [reg_addr_width_gp-1:0] score_rd_li2  = commit_pkt_cast_i.dcache_miss
     ? commit_pkt_cast_i.instr.t.fmatype.rd_addr
+    : commit_pkt2_cast_i.dcache_miss
+    ? commit_pkt2_cast_i.instr.t.fmatype.rd_addr
     : dispatch_pkt2_cast_i.instr.t.fmatype.rd_addr;
 
   wire [reg_addr_width_gp-1:0] score_rs1_li = dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr;
@@ -118,8 +117,11 @@ module bp_be_detector
   wire [reg_addr_width_gp-1:0] score_rs2_li2 = dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr;
   wire [reg_addr_width_gp-1:0] score_rs3_li2 = dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr;
 
+//clear address writes
   wire [reg_addr_width_gp-1:0] clear_ird_li = iwb_pkt_cast_i.rd_addr;
   wire [reg_addr_width_gp-1:0] clear_frd_li = fwb_pkt_cast_i.rd_addr;
+  wire [reg_addr_width_gp-1:0] clear_ird_li2 = iwb_pkt2_cast_i.rd_addr;
+  wire [reg_addr_width_gp-1:0] clear_frd_li2 = fwb_pkt2_cast_i.rd_addr;
 
   logic [1:0] irs_match_lo, irs_match_lo2;
   logic       ird_match_lo, ird_match_lo2;
@@ -128,16 +130,20 @@ module bp_be_detector
   //should add for both dispatches as at least one of these will use the multiply
   //so long as data dependenciesa are not an issue
   wire score_int_v_li = (dispatch_pkt_cast_i.v & dispatch_pkt_cast_i.decode.late_iwb_v)
-    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
+    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP})
+    || (commit_pkt2_cast_i.dcache_miss & commit_pkt2_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
   wire score_int_v_li2 = (dispatch_pkt2_cast_i.v & dispatch_pkt2_cast_i.decode.late_iwb_v)
-    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
-  wire clear_int_v_li = iwb_pkt_cast_i.ird_w_v & iwb_pkt_cast_i.late;
-  
+    || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP})
+    || (commit_pkt2_cast_i.dcache_miss & commit_pkt2_cast_i.instr.t.fmatype.opcode inside {`RV64_LOAD_OP, `RV64_AMO_OP});
+  wire clear_int_v_li = (iwb_pkt_cast_i.ird_w_v & iwb_pkt_cast_i.late);
+  wire clear_int_v_li2 = (iwb_pkt2_cast_i.ird_w_v & iwb_pkt2_cast_i.late);
   // integer scoreboard
   // I tried making an updated scoreboard so that may be helpful with dependencies btwn instr - Noah 
   //also maybe figure out how to add other dispatch into score board
   // FMA also stands for fused multiply add - a*b+c so scoreboards add also for long instr
 
+
+//ADD TWO CLEARS ONTO THE BOARD
   bp_be_scoreboard_di
    #(.bp_params_p(bp_params_p), .num_rs_p(2))
    int_scoreboard_di
@@ -148,7 +154,9 @@ module bp_be_detector
    ,.score_rd_i(score_rd_li), .score_rd_i2(score_rd_li2)
 
    ,.clear_v_i(clear_int_v_li)
+   ,.clear_v_i2(clear_int_v_li2)
    ,.clear_rd_i(clear_ird_li)
+   ,.clear_rd_i2(clear_ird_li2)
 
    ,.rs_i1({score_rs2_li, score_rs1_li})
    ,.rs_i2({score_rs2_li2, score_rs1_li2})
@@ -165,6 +173,7 @@ module bp_be_detector
   wire score_fp_v_li2 = (dispatch_pkt2_cast_i.v & dispatch_pkt2_cast_i.decode.late_fwb_v)
     || (commit_pkt_cast_i.dcache_miss & commit_pkt_cast_i.instr.t.fmatype.opcode == `RV64_FLOAD_OP);
   wire clear_fp_v_li = fwb_pkt_cast_i.frd_w_v & fwb_pkt_cast_i.late;
+  wire clear_fp_v_li2 = fwb_pkt2_cast_i.frd_w_v & fwb_pkt2_cast_i.late;
   //Float point scoreboard
   bp_be_scoreboard_di
    #(.bp_params_p(bp_params_p), .num_rs_p(3))
@@ -176,7 +185,9 @@ module bp_be_detector
    ,.score_rd_i(score_rd_li), .score_rd_i2(score_rd_li2)
 
    ,.clear_v_i(clear_fp_v_li)
+   ,.clear_v_i2(clear_fp_v_li2)
    ,.clear_rd_i(clear_frd_li)
+   ,.clear_rd_i2(clear_frd_li2)
 
    ,.rs_i1({score_rs3_li, score_rs2_li, score_rs1_li})
    ,.rs_i2({score_rs3_li2, score_rs2_li2, score_rs1_li2})

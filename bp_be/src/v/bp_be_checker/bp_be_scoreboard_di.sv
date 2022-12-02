@@ -16,8 +16,8 @@ module bp_be_scoreboard_di
    , input                                       score_v_i, score_v_i2
    , input [reg_addr_width_gp-1:0]               score_rd_i, score_rd_i2
 
-   , input                                       clear_v_i
-   , input [reg_addr_width_gp-1:0]               clear_rd_i
+   , input                                       clear_v_i, clear_v_i2
+   , input [reg_addr_width_gp-1:0]               clear_rd_i, clear_rd_i2
 
    , input [num_rs_p-1:0][reg_addr_width_gp-1:0] rs_i1
    , input [num_rs_p-1:0][reg_addr_width_gp-1:0] rs_i2
@@ -55,15 +55,23 @@ module bp_be_scoreboard_di
      ,.v_i(clear_v_i)
      ,.o(clear_onehot_li)
      );
+  logic [rf_els_lp-1:0] clear_onehot_li2;
+  bsg_decode_with_v2
+   #(.num_out_p(rf_els_lp))
+   clear_decode
+    (.i(clear_rd_i2)
+     ,.v_i(clear_v_i2)
+     ,.o(clear_onehot_li2)
+     );
 //set and clear, set has higher priority
 //update rd addresses in the scoreboard
   bsg_dff_reset_set_clear
    #(.width_p(rf_els_lp))
    scoreboard_reg
     (.clk_i(clk_i)
-     ,.reset_i(reset_i)s
+     ,.reset_i(reset_i)
      ,.set_i(score_onehot_li | score_onehot_li2)
-     ,.clear_i(clear_onehot_li)
+     ,.clear_i(clear_onehot_li | clear_onehot_li2)
      ,.data_o(scoreboard_r)
      );
 //match rs with scoreboard rd and match rds

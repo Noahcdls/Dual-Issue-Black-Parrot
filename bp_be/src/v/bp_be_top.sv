@@ -85,9 +85,9 @@ module bp_be_top
   logic dispatch_v1, dispatch_v2, interrupt_v;
   logic irq_pending_lo, irq_waiting_lo;
 
-  bp_be_commit_pkt_s commit_pkt;
+  bp_be_commit_pkt_s commit_pkt, commit_pkt2;
   bp_be_ptw_fill_pkt_s ptw_fill_pkt;
-  bp_be_wb_pkt_s iwb_pkt, fwb_pkt;
+  bp_be_wb_pkt_s iwb_pkt, fwb_pkt, iwb_pkt2, fwb_pkt2;
   bp_be_decode_info_s decode_info_lo;
 
   bp_be_isd_status_s isd_status1, isd_status2;
@@ -124,6 +124,7 @@ module bp_be_top
 
      ,.br_pkt_i(br_pkt) // from calculator
      ,.commit_pkt_i(commit_pkt) // from calculator
+     ,.commit_pkt2_i(commit_pkt2)
      );
 
   bp_be_detector
@@ -151,8 +152,11 @@ module bp_be_top
      ,.dispatch_pkt1_i(dispatch_pkt1)
      ,.dispatch_pkt2_i(dispatch_pkt2) // from scheduler
      ,.commit_pkt_i(commit_pkt) // from calculator
+     ,.commit_pkt2_i(commit_pkt2)
      ,.iwb_pkt_i(iwb_pkt) // from calculator
      ,.fwb_pkt_i(fwb_pkt) // from calculator
+     ,.iwb_pkt2_i(iwb_pkt2) // from calculator
+     ,.fwb_pkt2_i(fwb_pkt2) // from calculator
      );
 
   bp_be_scheduler
@@ -184,9 +188,12 @@ module bp_be_top
      ,.dispatch_pkt2_o(dispatch_pkt2) // to detector & calculator
 
      ,.commit_pkt_i(commit_pkt) // from calculator
+     ,.commit_pkt2_i(commit_pkt2)//ADD ANOTHER PORT
      ,.ptw_fill_pkt_i(ptw_fill_pkt) // from calculator
      ,.iwb_pkt_i(iwb_pkt) // from calculator
+     ,.iwb_pkt2_i(iwb_pkt2)//ADD EXTRA PORTS FOR WB PACKETS
      ,.fwb_pkt_i(fwb_pkt) // from calculator
+     ,.fwb_pkt2_i(fwb_pkt2)
      );
 
   bp_be_calculator_top
@@ -197,7 +204,8 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.dispatch_pkt_i(dispatch_pkt) // from scheduler
+     ,.dispatch_pkt1_i(dispatch_pkt) // from scheduler
+     ,.dispatch_pkt2_i(dispatch_pkt2)
 
      ,.decode_info_o(decode_info_lo) // to scheduler
      ,.mem_ready_o(mem_ready_lo) // to detector
@@ -207,9 +215,12 @@ module bp_be_top
 
      ,.br_pkt_o(br_pkt) // to director
      ,.commit_pkt_o(commit_pkt) // to detector & director & scheduler
+     ,.commit_pkt2_o(commit_pkt2)
      ,.ptw_fill_pkt_o(ptw_fill_pkt) // to scheduler
      ,.iwb_pkt_o(iwb_pkt) // to detector & scheduler
      ,.fwb_pkt_o(fwb_pkt) // to detector & scheduler
+     ,.iwb_pkt_o2(iwb_pkt2)
+     ,.fwb_pkt_o2(fwb_pkt2)
 
      //cache interface
      ,.cache_req_o(cache_req_o)
@@ -251,5 +262,5 @@ module bp_be_top
      ,.irq_waiting_o(irq_waiting_lo) // to director
      ,.cmd_full_n_i(cmd_full_n_lo) // from director
      );
-     
+
 endmodule

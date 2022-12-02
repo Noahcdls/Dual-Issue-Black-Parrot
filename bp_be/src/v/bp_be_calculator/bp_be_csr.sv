@@ -30,7 +30,7 @@ module bp_be_csr
    , output logic                            csr_csrw_o
 
    // Misc interface
-   , input [retire_pkt_width_lp-1:0]         retire_pkt_i
+   , input [retire_pkt_width_lp-1:0]         retire_pkt_i, retire_pkt2_i
    , input rv64_fflags_s                     fflags_acc_i
    //this input is connected to nothing
    , input                                   frf_w_v_i
@@ -45,7 +45,7 @@ module bp_be_csr
    , output logic                            irq_waiting_o
 
    // The final commit packet
-   , output logic [commit_pkt_width_lp-1:0]  commit_pkt_o
+   , output logic [commit_pkt_width_lp-1:0]  commit_pkt_o, commit_pkt2_o
 
    // Slow signals
    , output logic [decode_info_width_lp-1:0] decode_info_o
@@ -62,6 +62,8 @@ module bp_be_csr
   `bp_cast_i(bp_be_csr_cmd_s, csr_cmd);
   `bp_cast_i(bp_be_retire_pkt_s, retire_pkt);
   `bp_cast_o(bp_be_commit_pkt_s, commit_pkt);
+  `bp_cast_i(bp_be_retire_pkt_s, retire_pkt2);
+  `bp_cast_o(bp_be_commit_pkt_s, commit_pkt2);
   `bp_cast_o(bp_be_decode_info_s, decode_info);
   `bp_cast_o(bp_be_trans_info_s, trans_info);
 
@@ -186,6 +188,24 @@ module bp_be_csr
         ,default : '0
         };
 
+  assign exception_dec_li2 =
+      '{instr_misaligned    : retire_pkt2_cast_i.exception.instr_misaligned
+        ,instr_access_fault : retire_pkt2_cast_i.exception.instr_access_fault
+        ,illegal_instr      : retire_pkt2_cast_i.exception.illegal_instr
+        ,breakpoint         : retire_pkt2_cast_i.exception.ebreak
+        ,load_misaligned    : retire_pkt2_cast_i.exception.load_misaligned
+        ,load_access_fault  : retire_pkt2_cast_i.exception.load_access_fault
+        ,store_misaligned   : retire_pkt2_cast_i.exception.store_misaligned
+        ,store_access_fault : retire_pkt2_cast_i.exception.store_access_fault
+        ,ecall_u_mode       : retire_pkt2_cast_i.exception.ecall_u
+        ,ecall_s_mode       : retire_pkt2_cast_i.exception.ecall_s
+        ,ecall_m_mode       : retire_pkt2_cast_i.exception.ecall_m
+        ,instr_page_fault   : retire_pkt2_cast_i.exception.instr_page_fault
+        ,load_page_fault    : retire_pkt2_cast_i.exception.load_page_fault
+        ,store_page_fault   : retire_pkt2_cast_i.exception.store_page_fault
+        ,default : '0
+        };
+
   logic [3:0] exception_ecode_li;
   logic       exception_ecode_v_li;
   bsg_priority_encode
@@ -194,6 +214,16 @@ module bp_be_csr
     (.i(exception_dec_li)
      ,.addr_o(exception_ecode_li)
      ,.v_o(exception_ecode_v_li)
+     );
+//duplicated exception code
+  logic [3:0] exception_ecode_li2;
+  logic       exception_ecode_v_li2;
+  bsg_priority_encode
+   #(.width_p($bits(exception_dec_li2)), .lo_to_hi_p(1))
+   mcause_exception_enc2
+    (.i(exception_dec_li2)
+     ,.addr_o(exception_ecode_li2)
+     ,.v_o(exception_ecode_v_li2)
      );
 
   wire d_interrupt_icode_v_li = debug_irq_i;
@@ -207,6 +237,18 @@ module bp_be_csr
      ,.addr_o(m_interrupt_icode_li)
      ,.v_o(m_interrupt_icode_v_li)
      );
+ //Duplicated m interrupt encoding   
+  wire d_interrupt_icode_v_li2 = debug_irq_i;
+
+  logic [3:0] m_interrupt_icode_li2, s_interrupt_icode_li2;
+  logic       m_interrupt_icode_v_li2, s_interrupt_icode_v_li2;
+  bsg_priority_encode
+   #(.width_p($bits(exception_dec_li2)), .lo_to_hi_p(1))
+   m_interrupt_enc2
+    (.i(interrupt_icode_dec_li & ~mideleg_lo[0+:$bits(exception_dec_li2)])
+     ,.addr_o(m_interrupt_icode_li2)
+     ,.v_o(m_interrupt_icode_v_li2)
+     );
 
   bsg_priority_encode
    #(.width_p($bits(exception_dec_li)), .lo_to_hi_p(1))
@@ -215,11 +257,21 @@ module bp_be_csr
      ,.addr_o(s_interrupt_icode_li)
      ,.v_o(s_interrupt_icode_v_li)
      );
+//duplicated s interrupt
+  bsg_priority_encode
+   #(.width_p($bits(exception_dec_li2)), .lo_to_hi_p(1))
+   s_interrupt_enc
+    (.i(interrupt_icode_dec_li & mideleg_lo[0+:$bits(exception_dec_li2)])
+     ,.addr_o(s_interrupt_icode_li2)
+     ,.v_o(s_interrupt_icode_v_li2)
+     );
 
   wire csr_w_v_li = csr_cmd_v_i & (csr_cmd_cast_i.csr_op != e_csrr);
   wire csr_r_v_li = csr_cmd_v_i; // For now, all CSRs read, since we have no side-effects
   wire csr_fany_li = csr_cmd_cast_i.csr_addr inside {`CSR_ADDR_FCSR, `CSR_ADDR_FFLAGS, `CSR_ADDR_FRM};
   wire instr_fany_li = retire_pkt_cast_i.instr.t.rtype.opcode inside
+    {`RV64_FLOAD_OP, `RV64_FMADD_OP, `RV64_FMSUB_OP, `RV64_FNMSUB_OP, `RV64_FP_OP};
+  wire instr_fany_li2 = retire_pkt2_cast_i.instr.t.rtype.opcode inside
     {`RV64_FLOAD_OP, `RV64_FMADD_OP, `RV64_FMSUB_OP, `RV64_FNMSUB_OP, `RV64_FP_OP};
 
   // Compute input CSR data
@@ -250,7 +302,7 @@ module bp_be_csr
      ,.data_o(debug_mode_r)
      );
 
-  logic [vaddr_width_p-1:0] apc_n, apc_r;
+  logic [vaddr_width_p-1:0] apc_n, apc_r, apc2_n, apc2_r;
   bsg_dff_reset
    #(.width_p(vaddr_width_p))
    apc_reg
@@ -259,6 +311,16 @@ module bp_be_csr
 
      ,.data_i(apc_n)
      ,.data_o(apc_r)
+     );
+//duplicate pcs
+  bsg_dff_reset
+   #(.width_p(vaddr_width_p))
+   apc_reg2
+    (.clk_i(clk_i)
+     ,.reset_i(reset_i)
+
+     ,.data_i(apc2_n)
+     ,.data_o(apc2_r)
      );
 
   logic [vaddr_width_p-1:0] cfg_npc_r;
@@ -285,6 +347,13 @@ module bp_be_csr
     : retire_pkt_cast_i.special.mret
       ? mepc_lo
       : dpc_lo;
+
+  wire [vaddr_width_p-1:0] ret_pc2 =
+    retire_pkt2_cast_i.special.sret
+    ? sepc_lo
+    : retire_pkt2_cast_i.special.mret
+      ? mepc_lo
+      : dpc_lo;
   wire [vaddr_width_p-1:0] tvec_pc =
     is_debug_mode ? debug_exception_pc
     : (priv_mode_n == `PRIV_MODE_S)
@@ -300,7 +369,17 @@ module bp_be_csr
         ? retire_pkt_cast_i.npc
         : apc_r;
 
+  wire [vaddr_width_p-1:0] core_npc2 =
+    (exception_v_lo | interrupt_v_lo)
+    ? tvec_pc
+    : commit_pkt2_cast_o.eret
+      ? ret_pc2
+      : retire_pkt2_cast_i.instret
+        ? retire_pkt2_cast_i.npc
+        : apc_r;
+
   assign apc_n = (enter_debug | commit_pkt_cast_o.unfreeze) ? debug_halt_pc : core_npc;
+  assign apc2_n = (enter_debug | commit_pkt2_cast_o.unfreeze) ? debug_halt_pc : core_npc2;
 
   assign translation_en_n = ((priv_mode_n < `PRIV_MODE_M) & (satp_li.mode == 4'd8));
   bsg_dff_reset
@@ -518,7 +597,7 @@ module bp_be_csr
             end
         end
 
-      if (retire_pkt_cast_i.exception._interrupt)
+      if (retire_pkt_cast_i.exception._interrupt | retire_pkt2_cast_i.exception._interrupt)
         begin
           if (d_interrupt_icode_v_li & dgie)
             begin
@@ -610,12 +689,26 @@ module bp_be_csr
           dcsr_li.cause  = 1; // Ebreak
           dcsr_li.prv    = priv_mode_r;
         end
+      if (retire_pkt2_cast_i.special.dbreak)
+        begin
+          enter_debug    = 1'b1;
+          dpc_li         = `BSG_SIGN_EXTEND(apc_r, paddr_width_p);
+          dcsr_li.cause  = 1; // Ebreak
+          dcsr_li.prv    = priv_mode_r;
+        end
+
 
       if (retire_pkt_cast_i.special.dret)
         begin
           exit_debug       = 1'b1;
           priv_mode_n      = dcsr_lo.prv;
         end
+      if (retire_pkt2_cast_i.special.dret)
+        begin
+          exit_debug       = 1'b1;
+          priv_mode_n      = dcsr_lo.prv;
+        end
+
 
       if (retire_pkt_cast_i.special.mret)
         begin
@@ -626,6 +719,16 @@ module bp_be_csr
           mstatus_li.mie   = mstatus_lo.mpie;
           mstatus_li.mprv  = (priv_mode_n < `PRIV_MODE_M) ? '0 : mstatus_li.mprv;
         end
+      if (retire_pkt2_cast_i.special.mret)
+        begin
+          priv_mode_n      = mstatus_lo.mpp;
+
+          mstatus_li.mpp   = `PRIV_MODE_U;
+          mstatus_li.mpie  = 1'b1;
+          mstatus_li.mie   = mstatus_lo.mpie;
+          mstatus_li.mprv  = (priv_mode_n < `PRIV_MODE_M) ? '0 : mstatus_li.mprv;
+        end
+
 
       if (retire_pkt_cast_i.special.sret)
         begin
@@ -637,8 +740,26 @@ module bp_be_csr
           mstatus_li.mprv  = (priv_mode_n < `PRIV_MODE_M) ? '0 : mstatus_li.mprv;
         end
 
+      if (retire_pkt2_cast_i.special.sret)
+        begin
+          priv_mode_n      = {1'b0, mstatus_lo.spp};
+
+          mstatus_li.spp   = `PRIV_MODE_U;
+          mstatus_li.spie  = 1'b1;
+          mstatus_li.sie   = mstatus_lo.spie;
+          mstatus_li.mprv  = (priv_mode_n < `PRIV_MODE_M) ? '0 : mstatus_li.mprv;
+        end
+
+
       // Always break in single step mode
       if (~is_debug_mode & retire_pkt_cast_i.queue_v & dcsr_lo.step)
+        begin
+          enter_debug   = 1'b1;
+          dpc_li        = `BSG_SIGN_EXTEND(core_npc, paddr_width_p);
+          dcsr_li.cause = 4;
+          dcsr_li.prv   = priv_mode_r;
+        end
+      if (~is_debug_mode & retire_pkt2_cast_i.queue_v & dcsr_lo.step)
         begin
           enter_debug   = 1'b1;
           dpc_li        = `BSG_SIGN_EXTEND(core_npc, paddr_width_p);
@@ -657,7 +778,7 @@ module bp_be_csr
 
       // Set FS to dirty if: fflags set, frf written, fcsr written
       mstatus_li.fs |= {2{(csr_w_v_li & csr_fany_li & ~csr_illegal_instr_o)}};
-      mstatus_li.fs |= {2{(retire_pkt_cast_i.instret & instr_fany_li)}};
+      mstatus_li.fs |= ({2{(retire_pkt_cast_i.instret & instr_fany_li)}} | {2{(retire_pkt2_cast_i.instret & instr_fany_li2)}});
     end
 
   assign irq_pending_o = (~dcsr_lo.step | dcsr_lo.stepie)
@@ -700,6 +821,39 @@ module bp_be_csr
   //need to differentiate data points to determine proper pte according to type of fills
   assign commit_pkt_cast_o.itlb_fill_v      = retire_pkt_cast_i.exception.itlb_fill;
   assign commit_pkt_cast_o.dtlb_fill_v      = retire_pkt_cast_i.exception.dtlb_fill;
+
+
+
+
+  ///////////////////////////////////////COMMIT 2
+  assign commit_pkt2_cast_o.npc_w_v          = |{retire_pkt2_cast_i.special, retire_pkt2_cast_i.exception};
+  assign commit_pkt2_cast_o.queue_v          = retire_pkt2_cast_i.queue_v & ~|retire_pkt2_cast_i.exception;
+  assign commit_pkt2_cast_o.instret          = retire_pkt2_cast_i.instret;
+  assign commit_pkt2_cast_o.pc               = apc2_r;
+  assign commit_pkt2_cast_o.npc              = apc2_n;
+  assign commit_pkt2_cast_o.vaddr            = retire_pkt2_cast_i.vaddr;
+  assign commit_pkt2_cast_o.instr            = retire_pkt2_cast_i.instr;
+  assign commit_pkt2_cast_o.pte_leaf         = retire_pkt2_cast_i.data;
+  assign commit_pkt2_cast_o.priv_n           = priv_mode_n;
+  assign commit_pkt2_cast_o.translation_en_n = translation_en_n;
+  assign commit_pkt2_cast_o.exception        = exception_v_lo;
+  // Debug mode acts as a pseudo-interrupt
+  assign commit_pkt2_cast_o._interrupt       = interrupt_v_lo | enter_debug;
+  assign commit_pkt2_cast_o.fencei           = retire_pkt2_cast_i.special.fencei_clean;
+  assign commit_pkt2_cast_o.sfence           = retire_pkt2_cast_i.special.sfence_vma;
+  assign commit_pkt2_cast_o.wfi              = retire_pkt2_cast_i.special.wfi;
+  assign commit_pkt2_cast_o.eret             = |{retire_pkt2_cast_i.special.dret, retire_pkt2_cast_i.special.mret, retire_pkt2_cast_i.special.sret};
+  assign commit_pkt2_cast_o.csrw             = retire_pkt2_cast_i.special.csrw;
+  assign commit_pkt2_cast_o.unfreeze         = retire_pkt2_cast_i.exception.unfreeze;
+  assign commit_pkt2_cast_o.itlb_miss        = retire_pkt2_cast_i.exception.itlb_miss;
+  assign commit_pkt2_cast_o.icache_miss      = retire_pkt2_cast_i.exception.icache_miss;
+  assign commit_pkt2_cast_o.dtlb_store_miss  = retire_pkt2_cast_i.exception.dtlb_store_miss;
+  assign commit_pkt2_cast_o.dtlb_load_miss   = retire_pkt2_cast_i.exception.dtlb_load_miss;
+  assign commit_pkt2_cast_o.dcache_fail      = retire_pkt2_cast_i.exception.dcache_fail;
+  assign commit_pkt2_cast_o.dcache_miss      = retire_pkt2_cast_i.special.dcache_miss;
+  //need to differentiate data points to determine proper pte according to type of fills
+  assign commit_pkt2_cast_o.itlb_fill_v      = retire_pkt2_cast_i.exception.itlb_fill;
+  assign commit_pkt2_cast_o.dtlb_fill_v      = retire_pkt2_cast_i.exception.dtlb_fill;
 
   assign trans_info_cast_o.priv_mode      = priv_mode_r;
   assign trans_info_cast_o.base_ppn       = satp_lo.ppn;

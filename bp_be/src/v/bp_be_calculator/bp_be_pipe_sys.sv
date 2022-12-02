@@ -71,12 +71,13 @@ module bp_be_pipe_sys
   bp_be_decode_s decode;
   bp_be_csr_cmd_s csr_cmd_li;
   rv64_instr_s instr;
-  bp_be_commit_pkt_s commit_pkt;
+  bp_be_commit_pkt_s commit_pkt, commit_pkt2;
   bp_be_wb_pkt_s iwb_pkt, fwb_pkt, iwb_pkt2, fwb_pkt2;
   bp_be_decode_info_s decode_info;
   bp_be_trans_info_s trans_info;
 
   assign commit_pkt_o = commit_pkt;
+  assign commit_pkt_o2 = commit_pkt2;
   assign iwb_pkt = iwb_pkt_i;
   //assign new writeback packets for system
   assign iwb_pkt2 = iwb_pkt_i2;
@@ -122,7 +123,7 @@ module bp_be_pipe_sys
      ,.csr_illegal_instr_o(illegal_instr_o)
      ,.csr_csrw_o(csrw_o)
 
-     ,.fflags_acc_i(({5{iwb_pkt.fflags_w_v}} & iwb_pkt.fflags) | ({5{fwb_pkt.fflags_w_v}} & fwb_pkt.fflags))
+     ,.fflags_acc_i(({5{iwb_pkt.fflags_w_v}} & iwb_pkt.fflags) | ({5{fwb_pkt.fflags_w_v}} & fwb_pkt.fflags) | ({5{iwb_pkt2.fflags_w_v}} & iwb_pkt2.fflags) | ({5{fwb_pkt2.fflags_w_v}} & fwb_pkt2.fflags))
      ,.frf_w_v_i(fwb_pkt.frd_w_v)
 
      ,.debug_irq_i(debug_irq_i)
@@ -134,7 +135,9 @@ module bp_be_pipe_sys
      ,.irq_waiting_o(irq_waiting_o)
 
      ,.retire_pkt_i(retire_pkt)
+     ,.retire_pkt2_i(retire_pkt2)
      ,.commit_pkt_o(commit_pkt)
+     ,.commit_pkt2_o(commit_pkt2)
      ,.decode_info_o(decode_info)
      ,.trans_info_o(trans_info)
      ,.frm_dyn_o(frm_dyn_o)
@@ -147,47 +150,66 @@ module bp_be_pipe_sys
   logic [vaddr_width_p-1:0] retire_nvaddr_r, retire_vaddr_r;
   logic [instr_width_gp-1:0] retire_ninstr_r, retire_instr_r;
 
-  logic [vaddr_width_p-1:0] retire_npc_r2, retire_pc_r2;
+  logic [vaddr_width_p-1:0] retire_npc_r2, retire_pc_r2, pc2_n, pc2_r, pc1_r, pc1_n;
   logic [vaddr_width_p-1:0] retire_nvaddr_r2, retire_vaddr_r2;
   logic [instr_width_gp-1:0] retire_ninstr_r2, retire_instr_r2;
+
   //figure a way to update this logic to support both instructions
   always_ff @(posedge clk_i)
     begin
-      retire_npc_r <= retire_v_i2 ? retire. reservation.pc;
+      //if reservation 2 doesnt retire then our next pc comes from reservation 1 since that has to be populated
+      //if retire 2, then pass retire_npc_r2 which is always reservation 1 for the second instr
+      pc2_n <= reservation2.pc;
+      pc2_r <= pc2_n;
+      pc1_n <= reservation1.pc;
+      pc1_r <= pc1_n; 
+      retire_npc_r <= reservation1.pc;
       retire_pc_r  <= retire_npc_r;
 
-      retire_nvaddr_r <= rs1+imm;
+      retire_nvaddr_r <= reservation.rs1+reservation1.imm;
       retire_vaddr_r  <= retire_nvaddr_r;
 
-      retire_ninstr_r <= reservation.instr;
+      retire_ninstr_r <= reservation1.instr;
       retire_instr_r  <= retire_ninstr_r;
-    end
-//for second instr
-  always_ff @(posedge clk_i)
-    begin
-      retire_npc_r2 <= retire_v_i2 ? retire. reservation.pc;
-      retire_pc_r2  <= retire_npc_r;
+      //for second instr
 
-      retire_nvaddr_r2 <= reservation1.rs1[0+:dword_width_gp] + reservation1.imm[0+:dword_width_gp];
+      retire_npc_r2 <= reservation2.pc;
+      retire_pc_r2  <= retire_npc_r2;
+
+      retire_nvaddr_r2 <= reservation2.rs1[0+:dword_width_gp] + reservation2.imm[0+:dword_width_gp];
       retire_vaddr_r2  <= retire_nvaddr_r;
 
-      retire_ninstr_r2 <= reservation.instr;
+      retire_ninstr_r2 <= reservation2.instr;
       retire_instr_r2  <= retire_ninstr_r;
     end
   //valid retire without exception
   //I guess this is an instruction returns properly without exception
   wire instret_li = retire_v_i & ~|retire_exception_i;
+  wire instret_li = retire_v_i2 & ~|retire_exception_i2;
   assign retire_pkt =
     '{v          : retire_v_i
       ,queue_v   : retire_queue_v_i
       ,instret   : retire_v_i & ~|retire_exception_i
-      ,npc       : retire_npc_r
+      ,npc       : retire_v_i2 ? pc2_r : retire_npc_r
       ,vaddr     : retire_vaddr_r
       ,data      : retire_data_i
       ,instr     : retire_instr_r
       // Could do a preemptive onehot decode here
       ,exception : retire_v_i ? retire_exception_i : '0
       ,special   : instret_li ? retire_special_i   : '0
+      };
+  assign retire_pkt2 =
+    '{v          : retire_v_i2
+      ,queue_v   : retire_queue_v_i2
+      ,instret   : retire_v_i2 & ~|retire_exception_i2
+      //pass the pc1_n or retire_npc_r since next pc if we run 2 instr, the next instr for in order is the first instr in the next set
+      ,npc       : retire_npc_r
+      ,vaddr     : retire_vaddr_r2
+      ,data      : retire_data_i2
+      ,instr     : retire_instr_r2
+      // Could do a preemptive onehot decode here
+      ,exception : retire_v_i2 ? retire_exception_i2 : '0
+      ,special   : instret_li2 ? retire_special_i2   : '0
       };
 
 endmodule

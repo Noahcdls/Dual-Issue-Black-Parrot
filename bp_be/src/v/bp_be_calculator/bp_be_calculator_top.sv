@@ -330,7 +330,8 @@ module bp_be_calculator_top
      ,.reset_i(reset_i)
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.reservation_i(sys_reservation)
+     ,.reservation_i(reservation_r_1)
+     ,.reservation_i2(reservation_r_2)
      ,.flush_i(commit_pkt_cast_o.npc_w_v)
 
      ,.retire_v_i(exc_stage_r1[2].v)

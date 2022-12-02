@@ -55,7 +55,7 @@ module bp_be_director
    , input                              fe_cmd_yumi_i
 
    , input [branch_pkt_width_lp-1:0]    br_pkt_i
-   , input [commit_pkt_width_lp-1:0]    commit_pkt_i
+   , input [commit_pkt_width_lp-1:0]    commit_pkt_i, commit_pkt2_i
    );
 
   // Declare parameterized structures
@@ -68,11 +68,13 @@ module bp_be_director
   `bp_cast_i(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_branch_pkt_s, br_pkt);
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
+  `bp_cast_i(bp_be_commit_pkt_s, commit_pkt2);
 
   // Cast input and output ports
-  bp_fe_cmd_s                      fe_cmd_li;
+  bp_fe_cmd_s                      fe_cmd_li, fe_cmd_li2;
   logic                            fe_cmd_v_li, fe_cmd_ready_lo;
-  bp_fe_cmd_pc_redirect_operands_s fe_cmd_pc_redirect_operands;
+  logic                            fe_cmd_v_li2, fe_cmd_ready_lo2;
+  bp_fe_cmd_pc_redirect_operands_s fe_cmd_pc_redirect_operands, fe_cmd_pc_redirect_operands2;
 
   // Declare intermediate signals
   logic [vaddr_width_p-1:0]               npc_plus4;
@@ -88,8 +90,9 @@ module bp_be_director
   // Module instantiations
   // Update the NPC on a valid instruction in ex1 or upon commit
   // Should we double this??
-  wire npc_w_v = commit_pkt_cast_i.npc_w_v | br_pkt_cast_i.v;
-  assign npc_n = commit_pkt_cast_i.npc_w_v ? commit_pkt_cast_i.npc : br_pkt_cast_i.npc;
+  wire npc_w_v = commit_pkt_cast_i.npc_w_v | commit_pkt2_cast_i.npc_w_v | br_pkt_cast_i.v;
+  assign npc_n = commit_pkt_cast_i.npc_w_v ? commit_pkt_cast_i.npc : commit_pkt2_cast_i.npc_w_v 
+    ? commit_pkt2_cast_i.npc : br_pkt_cast_i.npc;
   bsg_dff_reset_en
    #(.width_p(vaddr_width_p))
    npc_reg
@@ -104,7 +107,7 @@ module bp_be_director
 
   //assuming only issue 1 has branch
   assign npc_mismatch_v = (isd_status1_cast_i.v & (expected_npc_o != isd_status1_cast_i.pc));
-  assign poison_isd_o = commit_pkt_cast_i.npc_w_v | npc_mismatch_v;
+  assign poison_isd_o = commit_pkt_cast_i.npc_w_v | commit_pkt2_cast_i.npc_w_v | npc_mismatch_v;
 
   logic btaken_pending, attaboy_pending;
   bsg_dff_reset_set_clear
@@ -128,7 +131,7 @@ module bp_be_director
     begin
       unique casez (state_r)
         e_wait  : state_n = fe_cmd_nonattaboy_v ? e_fence : e_wait;
-        e_run   : state_n = commit_pkt_cast_i.wfi ? e_wait : fe_cmd_nonattaboy_v ? e_fence : e_run;
+        e_run   : state_n = (commit_pkt_cast_i.wfi || commit_pkt2_cast_i.wfi) ? e_wait : fe_cmd_nonattaboy_v ? e_fence : e_run;
         e_fence : state_n = cmd_empty_n_o ? e_run : e_fence;
         // e_freeze:
         default : state_n = freeze_li ? e_freeze : e_wait;
@@ -256,6 +259,118 @@ module bp_be_director
           fe_cmd_li.operands.attaboy.branch_metadata_fwd = isd_status1_cast_i.branch_metadata_fwd;
 
           fe_cmd_v_li = fe_cmd_ready_lo;
+        end
+    end
+
+  always_comb
+    begin
+      fe_cmd_li2 = 'b0;
+      fe_cmd_v_li2 = 1'b0;
+      fe_cmd_pc_redirect_operands2 = '0;
+
+      if (commit_pkt2_cast_i.unfreeze)
+        begin
+          fe_cmd_li2.opcode = e_op_state_reset;
+          fe_cmd_li2.vaddr  = npc_r;
+
+          fe_cmd_pc_redirect_operands2.priv           = commit_pkt2_cast_i.priv_n;
+          fe_cmd_pc_redirect_operands2.translation_en = commit_pkt2_cast_i.translation_en_n;
+          fe_cmd_li2.operands.pc_redirect_operands    = fe_cmd_pc_redirect_operands2;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.itlb_fill_v)
+        begin
+          fe_cmd_li2.opcode                               = e_op_itlb_fill_response;
+          fe_cmd_li2.vaddr                                = commit_pkt2_cast_i.npc;
+          fe_cmd_li2.operands.itlb_fill_response.pte_leaf = commit_pkt2_cast_i.pte_leaf;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.sfence)
+        begin
+          fe_cmd_li2.opcode = e_op_itlb_fence;
+          fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.csrw)
+        begin
+          fe_cmd_li2.opcode                            = e_op_pc_redirection;
+          fe_cmd_li2.vaddr                             = commit_pkt2_cast_i.npc;
+          fe_cmd_pc_redirect_operands2.subopcode       = e_subop_translation_switch;
+          fe_cmd_pc_redirect_operands2.translation_en  = commit_pkt2_cast_i.translation_en_n;
+          fe_cmd_li2.operands.pc_redirect_operands     = fe_cmd_pc_redirect_operands2;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.wfi)
+        begin
+          fe_cmd_li2.opcode = e_op_wait;
+          fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.fencei)
+        begin
+          fe_cmd_li2.opcode = e_op_icache_fence;
+          fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.icache_miss)
+        begin
+          fe_cmd_li2.opcode = e_op_icache_fill_response;
+          fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.eret)
+        begin
+          fe_cmd_li2.opcode                                 = e_op_pc_redirection;
+          fe_cmd_li2.vaddr                                  = commit_pkt2_cast_i.npc;
+          fe_cmd_pc_redirect_operands2.subopcode            = e_subop_eret;
+          fe_cmd_pc_redirect_operands2.priv                 = commit_pkt2_cast_i.priv_n;
+          fe_cmd_pc_redirect_operands2.translation_en       = commit_pkt2_cast_i.translation_en_n;
+          fe_cmd_li2.operands.pc_redirect_operands          = fe_cmd_pc_redirect_operands2;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (commit_pkt2_cast_i.exception | commit_pkt2_cast_i._interrupt | (is_wait & irq_waiting_i))
+        begin
+          fe_cmd_li2.opcode                                 = e_op_pc_redirection;
+          fe_cmd_li2.vaddr                                  = commit_pkt2_cast_i.npc;
+          fe_cmd_pc_redirect_operands2.subopcode            = e_subop_trap;
+          fe_cmd_pc_redirect_operands2.priv                 = commit_pkt2_cast_i.priv_n;
+          fe_cmd_pc_redirect_operands2.translation_en       = commit_pkt2_cast_i.translation_en_n;
+          fe_cmd_li2.operands.pc_redirect_operands          = fe_cmd_pc_redirect_operands2;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      else if (isd_status1_cast_i.v & npc_mismatch_v)
+        begin
+          fe_cmd_li2.opcode                                 = e_op_pc_redirection;
+          fe_cmd_li2.vaddr                                  = expected_npc_o;
+          fe_cmd_pc_redirect_operands2.subopcode            = e_subop_branch_mispredict;
+          fe_cmd_pc_redirect_operands2.branch_metadata_fwd  = isd_status1_cast_i.branch_metadata_fwd;
+          fe_cmd_pc_redirect_operands2.misprediction_reason = last_instr_was_branch
+                                                             ? last_instr_was_btaken
+                                                               ? e_incorrect_pred_taken
+                                                               : e_incorrect_pred_ntaken
+                                                             : e_not_a_branch;
+          fe_cmd_li2.operands.pc_redirect_operands          = fe_cmd_pc_redirect_operands2;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
+        end
+      // Send an attaboy if there's a correct prediction
+      else if (isd_status1_cast_i.v & ~npc_mismatch_v & last_instr_was_branch)
+        begin
+          fe_cmd_li2.opcode                               = e_op_attaboy;
+          fe_cmd_li2.vaddr                                = expected_npc_o;
+          fe_cmd_li2.operands.attaboy.taken               = last_instr_was_btaken;
+          fe_cmd_li2.operands.attaboy.branch_metadata_fwd = isd_status1_cast_i.branch_metadata_fwd;
+
+          fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
     end
 

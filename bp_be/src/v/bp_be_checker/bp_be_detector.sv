@@ -47,9 +47,9 @@ module bp_be_detector
    , output logic                      dispatch_v_o, dispatch_v_o2//we can send the dispatch out
    , output logic                      interrupt_v_o//interrupt to stop sys
    , input [dispatch_pkt_width_lp-1:0] dispatch_pkt_i, dispatch_pkt2_i
-   , input [commit_pkt_width_lp-1:0]   commit_pkt_i//commits
-   , input [wb_pkt_width_lp-1:0]       iwb_pkt_i //writeback for int
-   , input [wb_pkt_width_lp-1:0]       fwb_pkt_i//floating writeback
+   , input [commit_pkt_width_lp-1:0]   commit_pkt_i, commit_pkt2_i//commits
+   , input [wb_pkt_width_lp-1:0]       iwb_pkt_i, iwb_pkt2_i //writeback for int
+   , input [wb_pkt_width_lp-1:0]       fwb_pkt_i, fwb_pkt2_i//floating writeback
    );
 
   `declare_bp_cfg_bus_s(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p);
@@ -61,9 +61,11 @@ module bp_be_detector
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt);
   `bp_cast_i(bp_be_dispatch_pkt_s, dispatch_pkt2)
   `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
+  `bp_cast_i(bp_be_commit_pkt_s, commit_pkt2);
   `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
   `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt);
-
+  `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt2);
+  `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt2);
   // Integer data hazards
   //read after write, write after write, data
   logic irs1_sb_raw_haz_v, irs2_sb_raw_haz_v;
