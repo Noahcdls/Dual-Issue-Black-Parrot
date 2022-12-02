@@ -135,23 +135,25 @@ module bp_be_detector
   wire clear_int_v_li = iwb_pkt_cast_i.ird_w_v & iwb_pkt_cast_i.late;
   
   // integer scoreboard
-  bp_be_scoreboard
+  bp_be_scoreboard_di
    #(.bp_params_p(bp_params_p), .num_rs_p(2))
-   int_scoreboard
-    (.clk_i(clk_i)
-     ,.reset_i(reset_i)
+   int_scoreboard_di
+  (.clk_i(clk_i)
+   ,.reset_i(reset_i)
 
-     ,.score_v_i(score_int_v_li)
-     ,.score_rd_i(score_rd_li)
+   ,.score_v_i(score1_int_v_li), .score_v_i2(score2_int_v_li)
+   ,.score_rd_i(score1_rd_li), .score_rd_i2(score2_rd_li)
 
-     ,.clear_v_i(clear_int_v_li)
-     ,.clear_rd_i(clear_ird_li)
+   ,.clear_v_i(clear_int_v_li)
+   ,.clear_rd_i(clear_ird_li)
 
-     ,.rs_i({score_rs2_li, score_rs1_li})
-     ,.rd_i(score_rd_li)
-     ,.rs_match_o(irs_match_lo)
-     ,.rd_match_o(ird_match_lo)
-     );
+   ,.rs_i1({score1_rs2_li, score1_rs1_li})
+   ,.rs_i2({score2_rs2_li, score2_rs1_li})
+   ,.rd_i(score1_rd_li), .rd_i2(score2_rd_li)
+
+   ,.rs_match_o1(irs_match1_lo), .rs_match_o2(irs_match2_lo)
+   ,.rd_match_o1(ird_match1_lo), .rd_match_o2(ird_match2_lo)
+   );
 
   logic [2:0] frs_match1_lo, frs_match2_lo;
   logic       frd_match1_lo, frd_match2_lo;
@@ -165,23 +167,25 @@ module bp_be_detector
   wire clear_fp_v_li = fwb_pkt_cast_i.frd_w_v & fwb_pkt_cast_i.late;
 
   //Float point scoreboard
-  bp_be_scoreboard
+  bp_be_scoreboard_di
    #(.bp_params_p(bp_params_p), .num_rs_p(3))
-   fp_scoreboard
-    (.clk_i(clk_i)
-     ,.reset_i(reset_i)
+   fp_scoreboard_di
+  (.clk_i(clk_i)
+   ,.reset_i(reset_i)
 
-     ,.score_v_i(score_fp_v_li)
-     ,.score_rd_i(score_rd_li)
+   ,.score_v_i(score1_fp_v_li), .score_v_i2(score2_fp_v_li)
+   ,.score_rd_i(score1_rd_li), .score_rd_i2(score2_rd_li)
 
-     ,.clear_v_i(clear_fp_v_li)
-     ,.clear_rd_i(clear_frd_li)
+   ,.clear_v_i(clear_fp_v_li)
+   ,.clear_rd_i(clear_frd_li)
 
-     ,.rs_i({score_rs3_li, score_rs2_li, score_rs1_li})
-     ,.rd_i(score_rd_li)
-     ,.rs_match_o(frs_match_lo)
-     ,.rd_match_o(frd_match_lo)
-     );
+   ,.rs_i1({score1_rs3_li, score1_rs2_li, score1_rs1_li})
+   ,.rs_i2({score2_rs3_li, score2_rs2_li, score2_rs1_li})
+   ,.rd_i(score1_rd_li), .rd_i2(score2_rd_li)
+
+   ,.rs_match_o1(frs_match1_lo), .rs_match_o2(frs_match2_lo)
+   ,.rd_match_o1(frd_match1_lo), .rd_match_o2(frd_match2_lo)
+   );
 
   always_comb
     begin

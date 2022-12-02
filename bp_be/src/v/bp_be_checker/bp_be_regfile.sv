@@ -40,9 +40,9 @@ module bp_be_regfile
    , output [2*read_ports_p-1:0][data_width_p-1:0]    rs_data_o
 
    // rd write bus
-   , input                                          rd_w_v_i
-   , input [reg_addr_width_gp-1:0]                  rd_addr_i
-   , input [data_width_p-1:0]                       rd_data_i
+   , input [1:0]                                         rd_w_v_i
+   , input [1:0][reg_addr_width_gp-1:0]                  rd_addr_i
+   , input [1:0][data_width_p-1:0]                       rd_data_i
    );
 
   localparam rf_els_lp = 2**reg_addr_width_gp;
@@ -73,7 +73,7 @@ module bp_be_regfile
       */
 
       bsg_mem_multiport
-       #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(1))
+       #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(2))
        rf
        (.clk_i(clk_i)
          ,.reset_i(reset_i)
@@ -116,7 +116,7 @@ module bp_be_regfile
       */
 
       bsg_mem_multiport
-       #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(1))
+       #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(2))
        rf
        (.clk_i(clk_i)
          ,.reset_i(reset_i)
@@ -136,7 +136,7 @@ module bp_be_regfile
     end
 
   // Save the written data for forwarding
-  logic [data_width_p-1:0] rd_data_r;
+  logic [1:0][data_width_p-1:0] rd_data_r;
   bsg_dff
    #(.width_p(data_width_p))
    rd_reg
@@ -147,20 +147,22 @@ module bp_be_regfile
 
   for (genvar i = 0; i < 2*read_ports_p; i++)
     begin : bypass
-      logic zero_rs_r, fwd_rs_r, rs_r_v_r;
-      logic [data_width_p-1:0] fwd_data_lo;
+      logic zero_rs_r, fwd_rs_r1, fwd_rs_r2, rs_r_v_r;
+      logic [data_width_p-1:0] fwd_data_lo1 ,fwd_data_lo2;
       wire zero_rs = rs_r_v_i[i] & (rs_addr_i[i] == '0) & (zero_x0_p == 1);
-      wire fwd_rs = rd_w_v_i & rs_r_v_i[i] & (rd_addr_i == rs_addr_i[i]);
+      wire fwd_rs1 = rd_w_v_i[0] & rs_r_v_i[i] & (rd_addr_i[0] == rs_addr_i[i]);
+      wire fwd_rs2 = rd_w_v_i[1] & rs_r_v_i[i] & (rd_addr_i[1] == rs_addr_i[i]);
       
       bsg_dff
-       #(.width_p(3))
+       #(.width_p(4))
        rs_r_v_reg
         (.clk_i(clk_i)
 
-         ,.data_i({zero_rs, fwd_rs, rs_r_v_i[i]})
-         ,.data_o({zero_rs_r, fwd_rs_r, rs_r_v_r})
+         ,.data_i({zero_rs, fwd_rs1, fwd_rs2, rs_r_v_i[i]})
+         ,.data_o({zero_rs_r, fwd_rs_r1, fwd_rs_r2, rs_r_v_r})
          );
-      assign fwd_data_lo = zero_rs_r ? '0 : fwd_rs_r ? rd_data_r : rs_data_lo[i];
+      assign fwd_data_lo1 = zero_rs_r ? '0 : fwd_rs_r1 ? rd_data_r[0] : rs_data_lo[i];
+      assign fwd_data_lo2 = zero_rs_r ? '0 : fwd_rs_r2 ? rd_data_r[1] : rs_data_lo[i];
 
       logic [reg_addr_width_gp-1:0] rs_addr_r;
       bsg_dff_en
@@ -173,26 +175,39 @@ module bp_be_regfile
          ,.data_o(rs_addr_r)
          );
 
-      logic [data_width_p-1:0] rs_data_n, rs_data_r;
-      wire replace_rs = rd_w_v_i & (rs_addr_r == rd_addr_i);
-      assign rs_data_n = replace_rs ? rd_data_i : fwd_data_lo;
+      logic [data_width_p-1:0] rs_data_n1, rs_data_n2, rs_data_r1, rs_data_r2;
+      wire replace_rs1 = rd_w_v_i[0] & (rs_addr_r == rd_addr_i[0]);
+      wire replace_rs2 = rd_w_v_i[1] & (rs_addr_r == rd_addr_i[1]);
+      assign rs_data_n1 = replace_rs1 ? rd_data_i[0] : fwd_data_lo1;
+      assign rs_data_n2 = replace_rs2 ? rd_data_i[1] : fwd_data_lo2;
       bsg_dff_en
        #(.width_p(data_width_p))
-       rs_data_reg
+       rs_data_reg1
         (.clk_i(clk_i)
 
-         ,.en_i(rs_r_v_r | replace_rs)
-         ,.data_i(rs_data_n)
-         ,.data_o(rs_data_r)
+         ,.en_i(rs_r_v_r | replace_rs1)
+         ,.data_i(rs_data_n1)
+         ,.data_o(rs_data_r1)
+         );
+
+      bsg_dff_en
+       #(.width_p(data_width_p))
+       rs_data_reg2
+        (.clk_i(clk_i)
+
+         ,.en_i(rs_r_v_r | replace_rs2)
+         ,.data_i(rs_data_n2)
+         ,.data_o(rs_data_r2)
          );
 
       // Technically, this is unnecessary, since most hardened SRAMs still write correctly
       //   on read-write conflicts, and the read is handled by forwarding. But this avoids
       //   nasty warnings and possible power sink.
-      assign rs_v_li[i] = rs_r_v_i[i] & ~fwd_rs;
+      assign rs_v_li[i] = rs_r_v_i[i] & ~(fwd_rs1 | fwd_rs2);
       assign rs_addr_li[i] = rs_addr_i[i];
       // Forward if we read/wrote, else pass out the register data
-      assign rs_data_o[i] = rs_r_v_r ? fwd_data_lo : rs_data_r;
+      assign rs_data_o[i] = (~rs_r_v_r) ? rs_data_r : 
+                            fwd_rs1 ? fwd_data_lo1 : fwd_data_lo2;
     end
 
 endmodule

@@ -1,11 +1,12 @@
 /* 
  * Modifications: 
- *   1. doubled inputs: fe_queue_i, fe_queue_v_i, fe_queue_yumi_i
+ *   1. doubled inputs: fe_queue_i, fe_queue_v_i, fe_queue_yumi_i, deq_v_i, roll_v_i
  *   2. doubled outputs: fe_queue_o, fe_queue_v_o, preissue_pkt_o, issue_pkt_o
  *   3. To be determined ports:  clr_v_i
  *   4. Changed module: reg_fifo_mem -> 2r2w
  *   5. Checkpoint ptr jmp step doubled
  *   6. instr type conflict should be solved in calculator
+ *   7. deq
  */
 
 `include "bp_common_defines.svh"
@@ -25,15 +26,15 @@ module bp_be_issue_queue
    , input                                  reset_i
 
    , input                                  clr_v_i // from director
-   , input                                  deq_v_i // from commit_pkt
-   , input                                  roll_v_i // from commit_pkt
+   , input                                  deq_v1_i, deq_v2_i // from commit_pkt
+   , input                                  roll_v1_i, roll_v2_i // from commit_pkt
 
    , input [fe_queue_width_lp-1:0]          fe_queue1_i, fe_queue2_i
    , input                                  fe_queue_v1_i, fe_queue_v2_i
    , output logic                           fe_queue_ready_o
 
    , output logic [fe_queue_width_lp-1:0]   fe_queue1_o, fe_queue2_o
-   , output logic                           fe_queue_v_o
+   , output logic                           fe_queue_v1_o, fe_queue_v2_o
    , input                                  fe_queue_yumi1_i, fe_queue_yumi2_i
 
    , output logic [issue_pkt_width_lp-1:0]  preissue_pkt1_o, preissue_pkt2_o
@@ -65,11 +66,17 @@ module bp_be_issue_queue
   // enq doubled
   wire enq1  = fe_queue_ready_o & fe_queue_v1_i;
   wire enq2  = fe_queue_ready_o & fe_queue_v2_i;
+  wire enq = enq1 | enq2;
 
-  wire deq  = deq_v_i; // = commit_pkt_cast_i.queue_v;
-  wire read = fe_queue_yumi1_i & fe_queue_yumi2_i;
+  wire deq1  = deq_v1_i; // = commit_pkt_cast_i.queue_v;
+  wire deq2  = deq_v2_i;
+  wire deq = deq1 | deq2;
+
+  wire read = fe_queue_yumi1_i | fe_queue_yumi2_i;
   wire clr  = clr_v_i; // = suppress_iss_i = (state_r != e_run)
-  wire roll = roll_v_i; // = commit_pkt_cast_i.npc_w_v;
+  wire roll1 = roll_v1_i; // = commit_pkt_cast_i.npc_w_v;
+  wire roll2 = roll_v2_i;
+  wire roll = roll1 | roll2;
 
   assign rptr_jmp = roll // = commit_pkt_cast_i.npc_w_v
                     ? (cptr_r - rptr_r + (ptr_width_lp+1)'(deq))//if not pc, to the next line of cptr
@@ -82,7 +89,7 @@ module bp_be_issue_queue
                        ? ((ptr_width_lp+1)'(2))
                        : ((ptr_width_lp+1)'(0));
   
-  assign cptr_jmp = (deq_v_i + 1'b1); // = commit_pkt_cast_i.queue_v + 1
+  assign cptr_jmp = deq << 1; //
 
   // reassign pointers
   assign wptr1_n = wptr_n;
@@ -99,15 +106,15 @@ module bp_be_issue_queue
                & (rptr_r[ptr_width_lp] == wptr_r[ptr_width_lp]);
   wire empty_n = (rptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp])
                  & (rptr_n[ptr_width_lp] == wptr_n[ptr_width_lp]);
-  wire full  = (cptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
+  wire full  = (cptr_r[0+:ptr_width_lp] - (ptr_width_lp)'(1) == wptr_r[0+:ptr_width_lp])
                & (cptr_r[ptr_width_lp] != wptr_r[ptr_width_lp]);
-  wire full_n = (cptr_n[0+:ptr_width_lp] == wptr_n[0+:ptr_width_lp])
+  wire full_n = (cptr_n[0+:ptr_width_lp] - (ptr_width_lp)'(1) == wptr_n[0+:ptr_width_lp])
                 & (cptr_n[ptr_width_lp] != wptr_n[ptr_width_lp]);
 
   
 
   bsg_circular_ptr
-   #(.slots_p(2*fe_queue_fifo_els_p), .max_add_p(1))
+   #(.slots_p(2*fe_queue_fifo_els_p), .max_add_p(2))
    cptr
     (.clk(clk_i)
      ,.reset_i(reset_i)
@@ -173,7 +180,8 @@ module bp_be_issue_queue
     );
 
 
-  assign fe_queue_v_o     = ~roll & ~empty;
+  assign fe_queue_v1_o     = ~roll1 & ~empty;
+  assign fe_queue_v2_o     = ~roll2 & ~empty;
   assign fe_queue_ready_o = ~clr & ~full;
 
   rv64_instr_fmatype_s instr1, instr2;
