@@ -160,62 +160,6 @@
                                                                                                    \
     typedef struct packed                                                                          \
     {                                                                                              \
-      logic                           npc_w_v1;                                                    \
-      logic                           queue_v1;                                                    \
-      logic                           instret1;                                                    \
-      logic [vaddr_width_p-1:0]       pc1;                                                         \
-      logic [vaddr_width_p-1:0]       npc1;                                                        \
-      logic [vaddr_width_p-1:0]       vaddr1;                                                      \
-      rv64_instr_s                    instr1;                                                      \
-      bp_be_pte_leaf_s                pte_leaf1;                                                   \
-      logic [rv64_priv_width_gp-1:0]  priv_n1;                                                     \
-      logic                           translation_en_n1;                                           \
-      logic                           exception1;                                                  \
-      logic                           _interrupt1;                                                 \
-      logic                           unfreeze1;                                                   \
-      logic                           eret1;                                                       \
-      logic                           fencei1;                                                     \
-      logic                           sfence1;                                                     \
-      logic                           csrw1;                                                       \
-      logic                           wfi1;                                                        \
-      logic                           itlb_miss1;                                                  \
-      logic                           icache_miss1;                                                \
-      logic                           dtlb_store_miss1;                                            \
-      logic                           dtlb_load_miss1;                                             \
-      logic                           dcache_miss1;                                                \
-      logic                           dcache_fail1;                                                \
-      logic                           itlb_fill_v1;                                                \
-      logic                           dtlb_fill_v1;                                                \
-      logic                           npc_w_v2;                                                    \
-      logic                           queue_v2;                                                    \
-      logic                           instret2;                                                    \
-      logic [vaddr_width_p-1:0]       pc2;                                                         \
-      logic [vaddr_width_p-1:0]       npc2;                                                        \
-      logic [vaddr_width_p-1:0]       vaddr2;                                                      \
-      rv64_instr_s                    instr2;                                                      \
-      bp_be_pte_leaf_s                pte_leaf2;                                                   \
-      logic [rv64_priv_width_gp-1:0]  priv_n2;                                                     \
-      logic                           translation_en_n2;                                           \
-      logic                           exception2;                                                  \
-      logic                           _interrupt2;                                                 \
-      logic                           unfreeze2;                                                   \
-      logic                           eret2;                                                       \
-      logic                           fencei2;                                                     \
-      logic                           sfence2;                                                     \
-      logic                           csrw2;                                                       \
-      logic                           wfi2;                                                        \
-      logic                           itlb_miss2;                                                  \
-      logic                           icache_miss2;                                                \
-      logic                           dtlb_store_miss2;                                            \
-      logic                           dtlb_load_miss2;                                             \
-      logic                           dcache_miss2;                                                \
-      logic                           dcache_fail2;                                                \
-      logic                           itlb_fill_v2;                                                \
-      logic                           dtlb_fill_v2;                                                \
-    }  bp_be_dualcommit_pkt_s;                                                                     \
-                                                                                                   \
-    typedef struct packed                                                                          \
-    {                                                                                              \
       logic                         ird_w_v;                                                       \
       logic                         frd_w_v;                                                       \
       logic                         late;                                                          \

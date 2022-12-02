@@ -381,8 +381,11 @@ module bp_be_director
      ,.reset_i(reset_i)
 
      ,.fe_cmd_i(fe_cmd_li)
+     ,.fe_cmd_i2(fe_cmd_li2)
      ,.fe_cmd_v_i(fe_cmd_v_li)
+     ,.fe_cmd_v_i2(fe_cmd_v_li2)
      ,.fe_cmd_ready_o(fe_cmd_ready_lo)
+     ,.fe_cmd_ready_o2(fe_cmd_ready_lo2)
 
      ,.fe_cmd_o(fe_cmd_o)
      ,.fe_cmd_v_o(fe_cmd_v_o)
