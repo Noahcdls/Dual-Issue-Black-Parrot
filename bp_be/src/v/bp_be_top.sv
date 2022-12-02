@@ -31,9 +31,9 @@ module bp_be_top
    , output                                          fe_queue_ready_o
 
    // FE cmd interface
-   , output [fe_cmd_width_lp-1:0]                    fe_cmd_o, fe_cmd_o2
-   , output                                          fe_cmd_v_o, fe_cmd_v_o2
-   , input                                           fe_cmd_yumi_i, fe_cmd_yumi_i2
+   , output [fe_cmd_width_lp-1:0]                    fe_cmd_o
+   , output                                          fe_cmd_v_o
+   , input                                           fe_cmd_yumi_i
 
    // D$-LCE Interface
    // signals to LCE
