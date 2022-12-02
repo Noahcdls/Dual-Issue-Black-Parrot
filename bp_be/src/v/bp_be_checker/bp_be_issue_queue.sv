@@ -79,12 +79,12 @@ module bp_be_issue_queue
   wire roll = roll1 | roll2;
 
   assign rptr_jmp = roll // = commit_pkt_cast_i.npc_w_v
-                    ? (cptr_r - rptr_r + (ptr_width_lp+1)'(deq))//if not pc, to the next line of cptr
+                    ? (cptr_r - rptr_r + ((ptr_width_lp+1)'(deq) << 1))//if not pc, to the next line of cptr
                     : read // read new instr 
                        ? ((ptr_width_lp+1)'(2))
                        : ((ptr_width_lp+1)'(0));
   assign wptr_jmp = clr
-                    ? (rptr_r - wptr_r + (ptr_width_lp+1)'(read))//if clr, to the next line of rptr
+                    ? (rptr_r - wptr_r + ((ptr_width_lp+1)'(read) << 1))//if clr, to the next line of rptr
                     : enq // new instr inserted
                        ? ((ptr_width_lp+1)'(2))
                        : ((ptr_width_lp+1)'(0));
@@ -97,7 +97,11 @@ module bp_be_issue_queue
   assign wptr1_r = wptr_r;
   assign wptr2_r = wptr_r + (ptr_width_lp)'(1);
 
-  assign rptr1_n = rptr_n;
+  assign rptr1_n = roll1
+                   ?  rptr_n
+                   : roll2
+                      ? rptr_r + (read? )
+                      : ();
   assign rptr2_n = rptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
   assign rptr1_r = rptr_r;
   assign rptr2_r = rptr_r + (ptr_width_lp)'(1);
@@ -111,7 +115,6 @@ module bp_be_issue_queue
   wire full_n = (cptr_n[0+:ptr_width_lp] - (ptr_width_lp)'(1) == wptr_n[0+:ptr_width_lp])
                 & (cptr_n[ptr_width_lp] != wptr_n[ptr_width_lp]);
 
-  
 
   bsg_circular_ptr
    #(.slots_p(2*fe_queue_fifo_els_p), .max_add_p(2))
@@ -122,7 +125,7 @@ module bp_be_issue_queue
      ,.o(cptr_r)
      ,.n_o(cptr_n)
      );
-
+  /*
   bsg_circular_ptr
    #(.slots_p(2*fe_queue_fifo_els_p),.max_add_p(2*fe_queue_fifo_els_p-1))
    wptr
@@ -132,7 +135,23 @@ module bp_be_issue_queue
      ,.o(wptr_r)
      ,.n_o(wptr_n)
      );
+  */
 
+  bp_be_autowrap_ptr
+   #(.slots_p(2*fe_queue_fifo_els_p),.max_add_p(2*fe_queue_fifo_els_p-1))
+   wptr
+    (.clk(clk_i)
+     ,.reset_i(reset_i)
+     ,.add_i(wptr_jmp)
+     ,.p_i(wptr_r)
+     ,.n_o(wptr_n)
+     );
+  
+  always_ff @(posedge clk)
+    if (reset_i) wptr_r <= 0;
+    else       wptr_r <= wptr_n;
+
+  /*
   bsg_circular_ptr
   #(.slots_p(2*fe_queue_fifo_els_p), .max_add_p(2*fe_queue_fifo_els_p-1))
   rptr
@@ -142,7 +161,22 @@ module bp_be_issue_queue
     ,.o(rptr_r)
     ,.n_o(rptr_n)
     );
+  */
   
+  bp_be_autowrap_ptr
+   #(.slots_p(2*fe_queue_fifo_els_p),.max_add_p(2*fe_queue_fifo_els_p-1))
+  rptr
+   (.clk(clk_i)
+    ,.reset_i(reset_i)
+    ,.add_i(rptr_jmp)
+    ,.p_i(rptr_r)
+    ,.n_o(rptr_n)
+    );
+
+  always_ff @(posedge clk)
+    if (reset_i) rptr_r <= 0;
+    else       rptr_r <= rptr_n;
+
   /*
   bsg_mem_1r1w
   #(.width_p(fe_queue_width_lp), .els_p(fe_queue_fifo_els_p))
