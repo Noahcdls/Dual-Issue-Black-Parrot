@@ -689,9 +689,9 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
         //e_fe_fetch is 0. Indicates function and not exception
         fe_queue_cast_o2.msg_type                      = e_fe_fetch;
         //PC value of instr
-        fe_queue_cast_o2.msg.fetch.pc                  =  is_branch ?  0 : fetch_pc_lo2;
+        fe_queue_cast_o2.msg.fetch.pc                  =  fetch_pc_lo2;
         //the instr itself from icache
-        fe_queue_cast_o2.msg.fetch.instr               = is_branch ?  0 : fetch_li2;
+        fe_queue_cast_o2.msg.fetch.instr               = fetch_li2;
         fe_queue_cast_o2.msg.fetch.branch_metadata_fwd = fetch_br_metadata_fwd_lo;
       end
 
