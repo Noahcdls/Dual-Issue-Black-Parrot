@@ -69,9 +69,9 @@ module bp_be_scheduler
   , output [dispatch_pkt_width_lp-1:0] dispatch_pkt1_o, dispatch_pkt2_o
 
   // from calculator
-  , input [commit_pkt_width_lp-1:0]    commit_pkt_i
-  , input [wb_pkt_width_lp-1:0]        iwb_pkt_i
-  , input [wb_pkt_width_lp-1:0]        fwb_pkt_i
+  , input [commit_pkt_width_lp-1:0]    commit_pkt1_i, commit_pkt2_i
+  , input [wb_pkt_width_lp-1:0]        iwb_pkt1_i, iwb_pkt1_i
+  , input [wb_pkt_width_lp-1:0]        fwb_pkt1_i, fwb_pkt2_i
   , input [ptw_fill_pkt_width_lp-1:0]  ptw_fill_pkt_i
   );
 
@@ -83,17 +83,27 @@ module bp_be_scheduler
   `bp_cast_o(bp_be_isd_status_s, isd_status1);
   `bp_cast_o(bp_be_isd_status_s, isd_status2);
   `bp_cast_i(bp_be_ptw_fill_pkt_s, ptw_fill_pkt);
-  `bp_cast_i(bp_be_commit_pkt_s, commit_pkt);
-  `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt);
-  `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt);
+  `bp_cast_i(bp_be_commit_pkt_s, commit_pkt1);
+  `bp_cast_i(bp_be_commit_pkt_s, commit_pkt2);
+  `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt1);
+  `bp_cast_i(bp_be_wb_pkt_s, iwb_pkt2);
+  `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt1);
+  `bp_cast_i(bp_be_wb_pkt_s, fwb_pkt2);
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
 
   bp_fe_queue_s fe_queue1_lo, fe_queue2_lo; //doubled
   logic fe_queue_yumi1_li, fe_queue_yumi2_li; // doubled
-  logic fe_queue_v_lo; // no need to be doubled for now
+  logic fe_queue_v1_lo;
+  logic fe_queue_v2_lo;
+
   wire fe_queue_clr_li  = suppress_iss_i; // no need to be doubled for now
-  wire fe_queue_deq_li  = commit_pkt_cast_i.queue_v;
-  wire fe_queue_roll_li = commit_pkt_cast_i.npc_w_v;
+
+  wire fe_queue_deq1_li  = commit_pkt1_cast_i.queue_v;
+  wire fe_queue_deq2_li  = commit_pkt2_cast_i.queue_v;
+
+  wire fe_queue_roll1_li = commit_pkt1_cast_i.npc_w_v;
+  wire fe_queue_roll2_li = commit_pkt2_cast_i.npc_w_v;
+
   bp_be_issue_pkt_s preissue_pkt1, issue_pkt1, preissue_pkt2, issue_pkt2; //doubled
   
 
@@ -104,8 +114,10 @@ module bp_be_scheduler
      ,.reset_i(reset_i)
 
      ,.clr_v_i(fe_queue_clr_li) // from director
-     ,.deq_v_i(fe_queue_deq_li) // from calculator
-     ,.roll_v_i(fe_queue_roll_li) // from calculator
+     ,.deq_v1_i(fe_queue_deq1_li) // from calculator
+     ,.deq_v2_i(fe_queue_deq2_li)
+     ,.roll_v1_i(fe_queue_roll1_li)
+     ,.roll_v2i(fe_queue_roll2_li) // from calculator
      
      // from Fe
      ,.fe_queue1_i(fe_queue1_i)
@@ -116,7 +128,8 @@ module bp_be_scheduler
 
      ,.fe_queue1_o(fe_queue1_lo)
      ,.fe_queue2_o(fe_queue2_lo)
-     ,.fe_queue_v_o(fe_queue_v_lo)
+     ,.fe_queue_v1_o(fe_queue_v1_lo)
+     ,.fe_queue_v2_o(fe_queue_v2_lo)
      ,.fe_queue_yumi1_i(fe_queue_yumi1_li)
      ,.fe_queue_yumi2_i(fe_queue_yumi2_li)
 
@@ -133,12 +146,12 @@ module bp_be_scheduler
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.rd_w_v_i(iwb_pkt_cast_i.ird_w_v)
-     ,.rd_addr_i(iwb_pkt_cast_i.rd_addr)
-     ,.rd_data_i(iwb_pkt_cast_i.rd_data[0+:dword_width_gp])
+     ,.rd_w_v_i({iwb_pkt1_cast_i.ird_w_v, iwb_pkt2_cast_i.ird_w_v})
+     ,.rd_addr_i({iwb_pkt1_cast_i.rd_addr, iwb_pkt2_cast_i.rd_addr})
+     ,.rd_data_i({iwb_pkt1_cast_i.rd_data[0+:dword_width_gp], iwb_pkt2_cast_i.rd_data[0+:dword_width_gp]})
 
-     ,.rs_r_v_i({preissue_pkt1.irs2_v, preissue_pkt2.irs1_v, preissue_pkt1.irs2_v, preissue_pkt2.irs1_v})
-     ,.rs_addr_i({preissue_pkt1.rs2_addr, preissue_pkt2.rs1_addr, preissue_pkt1.rs2_addr, preissue_pkt2.rs1_addr})
+     ,.rs_r_v_i({preissue_pkt1.irs2_v, preissue_pkt1.irs1_v, preissue_pkt2.irs2_v, preissue_pkt2.irs1_v})
+     ,.rs_addr_i({preissue_pkt1.rs2_addr, preissue_pkt1.rs1_addr, preissue_pkt2.rs2_addr, preissue_pkt2.rs1_addr})
      ,.rs_data_o({irf1_rs2, irf1_rs1, irf2_rs2, irf2_rs1})
      );
 
@@ -149,9 +162,9 @@ module bp_be_scheduler
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.rd_w_v_i(fwb_pkt_cast_i.frd_w_v)
-     ,.rd_addr_i(fwb_pkt_cast_i.rd_addr)
-     ,.rd_data_i(fwb_pkt_cast_i.rd_data)
+     ,.rd_w_v_i({fwb_pkt1_cast_i.frd_w_v, fwb_pkt2_cast_i.frd_w_v})
+     ,.rd_addr_i({fwb_pkt1_cast_i.rd_addr, fwb_pkt2_cast_i.rd_addr})
+     ,.rd_data_i({fwb_pkt1_cast_i.rd_data, fwb_pkt2_cast_i.rd_data})
 
      ,.rs_r_v_i({preissue_pkt1.frs3_v, preissue_pkt1.frs2_v, preissue_pkt1.frs1_v, preissue_pkt2.frs3_v, preissue_pkt2.frs2_v, preissue_pkt2.frs1_v})
      ,.rs_addr_i({preissue_pkt1.rs3_addr, preissue_pkt1.rs2_addr, preissue_pkt1.rs1_addr, preissue_pkt2.rs3_addr, preissue_pkt2.rs2_addr, preissue_pkt2.rs1_addr})
@@ -168,65 +181,65 @@ module bp_be_scheduler
   logic dret1_lo, mret1_lo, sret1_lo;
   logic dret2_lo, mret2_lo, sret2_lo;
   logic wfi1_lo, sfence_vma1_lo, wfi2_lo, sfence_vma2_lo;
-  
+
   bp_be_instr_decoder
    #(.bp_params_p(bp_params_p))
-   instr_decoder
+   instr_decoder1
     (.instr_i(fe_queue1_lo.msg.fetch.instr)
-     ,.instr_i(fe_queue2_lo.msg.fetch.instr)
-     
      ,.decode_info_i(decode_info_i)
 
-     ,.decode1_o(instr_decoded1)
-     ,.decode2_o(instr_decoded2)
+     ,.decode_o(instr_decoded1)
+     ,.imm_o(decoded_imm1_lo)
 
-     ,.imm1_o(decoded_imm1_lo)
-     ,.imm2_o(decoded_imm2_lo)
-
-     ,.illegal_instr1_o(illegal_instr1_lo)
-     ,.illegal_instr2_o(illegal_instr2_lo)
-     
-     ,.ecall_m1_o(ecall_m1_lo)
-     ,.ecall_s1_o(ecall_s1_lo)
-     ,.ecall_u1_o(ecall_u1_lo)
-     ,.ebreak1_o(ebreak1_lo)
-     ,.dbreak1_o(dbreak1_lo)
-     ,.dret1_o(dret1_lo)
-     ,.mret1_o(mret1_lo)
-     ,.sret1_o(sret1_lo)
-     ,.wfi1_o(wfi1_lo)
-     ,.sfence_vma1_o(sfence_vma1_lo)
-
-     ,.ecall_m2_o(ecall_m2_lo)
-     ,.ecall_s2_o(ecall_s2_lo)
-     ,.ecall_u2_o(ecall_u2_lo)
-     ,.ebreak2_o(ebreak2_lo)
-     ,.dbreak2_o(dbreak2_lo)
-     ,.dret2_o(dret2_lo)
-     ,.mret2_o(mret2_lo)
-     ,.sret2_o(sret2_lo)
-     ,.wfi2_o(wfi2_lo)
-     ,.sfence_vma2_o(sfence_vma2_lo)
+     ,.illegal_instr_o(illegal_instr1_lo)
+     ,.ecall_m_o(ecall_m1_lo)
+     ,.ecall_s_o(ecall_s1_lo)
+     ,.ecall_u_o(ecall_u1_lo)
+     ,.ebreak_o(ebreak1_lo)
+     ,.dbreak_o(dbreak1_lo)
+     ,.dret_o(dret1_lo)
+     ,.mret_o(mret1_lo)
+     ,.sret_o(sret1_lo)
+     ,.wfi_o(wfi1_lo)
+     ,.sfence_vma_o(sfence_vma1_lo)
      );
+
+  bp_be_instr_decoder
+   #(.bp_params_p(bp_params_p))
+   instr_decoder2
+    (.instr_i(fe_queue2_lo.msg.fetch.instr)
+     ,.decode_info_i(decode_info_i)
+
+     ,.decode_o(instr_decoded2)
+     ,.imm_o(decoded_imm2_lo)
+
+     ,.illegal_instr_o(illegal_instr2_lo)
+     ,.ecall_m_o(ecall_m2_lo)
+     ,.ecall_s_o(ecall_s2_lo)
+     ,.ecall_u_o(ecall_u2_lo)
+     ,.ebreak_o(ebreak2_lo)
+     ,.dbreak_o(dbreak2_lo)
+     ,.dret_o(dret2_lo)
+     ,.mret_o(mret2_lo)
+     ,.sret_o(sret2_lo)
+     ,.wfi_o(wfi2_lo)
+     ,.sfence_vma_o(sfence_vma2_lo)
+     );
+
   //doubled
-  // exception not instruction
   wire fe_exc_not_instr1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == e_fe_exception);
   wire fe_exc_not_instr2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == e_fe_exception);
 
   //doubled
-  // exception vaddr
   wire [vaddr_width_p-1:0] fe_exc_vaddr1_li = fe_queue1_lo.msg.exception.vaddr;
   wire [vaddr_width_p-1:0] fe_exc_vaddr1_li = fe_queue2_lo.msg.exception.vaddr;
   
   // no need to be doubled for now
-  // back end exception vaddr and data
-  // also backend has exception not instr
   wire be_exc_not_instr_li = ptw_fill_pkt_cast_i.v | interrupt_v_i | unfreeze_i;
   wire [vaddr_width_p-1:0] be_exc_vaddr_li = ptw_fill_pkt_cast_i.vaddr;
   wire [dpath_width_gp-1:0] be_exc_data_li = ptw_fill_pkt_cast_i.entry;
   
   //doubled
-  // instruction not exception
   wire fe_instr_not_exc1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == e_fe_fetch);
   wire fe_instr_not_exc2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == e_fe_fetch);
   
