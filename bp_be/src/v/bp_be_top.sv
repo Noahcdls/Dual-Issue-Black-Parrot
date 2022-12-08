@@ -2,7 +2,7 @@
  *
  *  Name:
  *    bp_be_top.v
- *
+ *    Added dual instruction support among modules.
  */
 
 `include "bp_common_defines.svh"
@@ -112,9 +112,7 @@ module bp_be_top
      ,.fe_cmd_o(fe_cmd_o) // BE output
      ,.fe_cmd_v_o(fe_cmd_v_o) // BE output
      ,.fe_cmd_yumi_i(fe_cmd_yumi_i) // BE input
-     ,.fe_cmd_o2(fe_cmd_o2) // BE output
-     ,.fe_cmd_v_o2(fe_cmd_v_o2) // BE output
-     ,.fe_cmd_yumi_i2(fe_cmd_yumi_i2) // BE input
+
 
      ,.unfreeze_o(unfreeze_lo) // to scheduler
      ,.suppress_iss_o(suppress_iss_lo) // to scheduler
@@ -138,7 +136,7 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.isd_status1_i(isd_status1)
+     ,.isd_status_i(isd_status1)
      ,.isd_status2_i(isd_status2) // from scheduler
      ,.cmd_full_i(cmd_full_r_lo) // from director
      ,.credits_full_i(cache_req_credits_full_i) // BE input
@@ -149,10 +147,10 @@ module bp_be_top
      ,.ptw_busy_i(ptw_busy_lo) // from calculator
      ,.irq_pending_i(irq_pending_lo)  // from calculator
 
-     ,.dispatch_v1_o(dispatch_v1)
-     ,.dispatch_v2_o(dispatch_v2) // to scheduler
+     ,.dispatch_v_o(dispatch_v1)
+     ,.dispatch_v_o2(dispatch_v2) // to scheduler
      ,.interrupt_v_o(interrupt_v) // to scheduler
-     ,.dispatch_pkt1_i(dispatch_pkt1)
+     ,.dispatch_pkt_i(dispatch_pkt1)
      ,.dispatch_pkt2_i(dispatch_pkt2) // from scheduler
      ,.commit_pkt_i(commit_pkt) // from calculator
      ,.commit_pkt2_i(commit_pkt2)
@@ -190,12 +188,12 @@ module bp_be_top
      ,.dispatch_pkt1_o(dispatch_pkt1)
      ,.dispatch_pkt2_o(dispatch_pkt2) // to detector & calculator
 
-     ,.commit_pkt_i(commit_pkt) // from calculator
+     ,.commit_pkt1_i(commit_pkt) // from calculator
      ,.commit_pkt2_i(commit_pkt2)//ADD ANOTHER PORT
      ,.ptw_fill_pkt_i(ptw_fill_pkt) // from calculator
-     ,.iwb_pkt_i(iwb_pkt) // from calculator
+     ,.iwb_pkt1_i(iwb_pkt) // from calculator
      ,.iwb_pkt2_i(iwb_pkt2)//ADD EXTRA PORTS FOR WB PACKETS
-     ,.fwb_pkt_i(fwb_pkt) // from calculator
+     ,.fwb_pkt1_i(fwb_pkt) // from calculator
      ,.fwb_pkt2_i(fwb_pkt2)
      );
 
@@ -207,7 +205,7 @@ module bp_be_top
 
      ,.cfg_bus_i(cfg_bus_i)
 
-     ,.dispatch_pkt1_i(dispatch_pkt) // from scheduler
+     ,.dispatch_pkt1_i(dispatch_pkt1) // from scheduler
      ,.dispatch_pkt2_i(dispatch_pkt2)
 
      ,.decode_info_o(decode_info_lo) // to scheduler

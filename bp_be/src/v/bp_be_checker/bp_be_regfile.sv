@@ -74,8 +74,8 @@ module bp_be_regfile
       bsg_mem_multiport
        #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(2))
        rf
-       (.clk_i(clk_i)
-         ,.reset_i(reset_i)
+       ( .w_clk_i(clk_i)
+         ,.w_reset_i(reset_i)
 
          ,.w_v_i(rd_w_v_i)
          ,.w_addr_i(rd_addr_i)
@@ -113,8 +113,8 @@ module bp_be_regfile
       bsg_mem_multiport
        #(.width_p(data_width_p), .els_p(rf_els_lp), .read_ports_p(2*read_ports_p), .write_ports_p(2))
        rf
-       (.clk_i(clk_i)
-         ,.reset_i(reset_i)
+       (.w_clk_i(clk_i)
+         ,.w_reset_i(reset_i)
 
          ,.w_v_i(rd_w_v_i)
          ,.w_addr_i(rd_addr_i)

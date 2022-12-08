@@ -70,7 +70,7 @@ module bp_be_scheduler
 
   // from calculator
   , input [commit_pkt_width_lp-1:0]    commit_pkt1_i, commit_pkt2_i
-  , input [wb_pkt_width_lp-1:0]        iwb_pkt1_i, iwb_pkt1_i
+  , input [wb_pkt_width_lp-1:0]        iwb_pkt1_i, iwb_pkt2_i
   , input [wb_pkt_width_lp-1:0]        fwb_pkt1_i, fwb_pkt2_i
   , input [ptw_fill_pkt_width_lp-1:0]  ptw_fill_pkt_i
   );
@@ -113,11 +113,11 @@ module bp_be_scheduler
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
-     ,.clr_v_i(fe_queue_clr_li) // from director
+     ,.clr_v_i(0 & fe_queue_clr_li) // from director
      ,.deq_v1_i(fe_queue_deq1_li) // from calculator
      ,.deq_v2_i(fe_queue_deq2_li)
      ,.roll_v1_i(fe_queue_roll1_li)
-     ,.roll_v2i(fe_queue_roll2_li) // from calculator
+     ,.roll_v2_i(fe_queue_roll2_li) // from calculator
      
      // from Fe
      ,.fe_queue1_i(fe_queue1_i)
@@ -185,50 +185,47 @@ module bp_be_scheduler
   bp_be_instr_decoder
    #(.bp_params_p(bp_params_p))
    instr_decoder1
-    (.instr_i(fe_queue1_lo.msg.fetch.instr)
+    (.instr1_i(fe_queue1_lo.msg.fetch.instr)
      ,.decode_info_i(decode_info_i)
 
-     ,.decode_o(instr_decoded1)
-     ,.imm_o(decoded_imm1_lo)
+     ,.decode1_o(instr_decoded1)
+     ,.imm1_o(decoded_imm1_lo)
 
-     ,.illegal_instr_o(illegal_instr1_lo)
-     ,.ecall_m_o(ecall_m1_lo)
-     ,.ecall_s_o(ecall_s1_lo)
-     ,.ecall_u_o(ecall_u1_lo)
-     ,.ebreak_o(ebreak1_lo)
-     ,.dbreak_o(dbreak1_lo)
-     ,.dret_o(dret1_lo)
-     ,.mret_o(mret1_lo)
-     ,.sret_o(sret1_lo)
-     ,.wfi_o(wfi1_lo)
-     ,.sfence_vma_o(sfence_vma1_lo)
+     ,.illegal_instr1_o(illegal_instr1_lo)
+     ,.ecall_m1_o(ecall_m1_lo)
+     ,.ecall_s1_o(ecall_s1_lo)
+     ,.ecall_u1_o(ecall_u1_lo)
+     ,.ebreak1_o(ebreak1_lo)
+     ,.dbreak1_o(dbreak1_lo)
+     ,.dret1_o(dret1_lo)
+     ,.mret1_o(mret1_lo)
+     ,.sret1_o(sret1_lo)
+     ,.wfi1_o(wfi1_lo)
+     ,.sfence_vma1_o(sfence_vma1_lo)
+
+     ,.instr2_i(fe_queue2_lo.msg.fetch.instr)
+
+     ,.decode2_o(instr_decoded2)
+     ,.imm2_o(decoded_imm2_lo)
+
+     ,.illegal_instr2_o(illegal_instr2_lo)
+     ,.ecall_m2_o(ecall_m2_lo)
+     ,.ecall_s2_o(ecall_s2_lo)
+     ,.ecall_u2_o(ecall_u2_lo)
+     ,.ebreak2_o(ebreak2_lo)
+     ,.dbreak2_o(dbreak2_lo)
+     ,.dret2_o(dret2_lo)
+     ,.mret2_o(mret2_lo)
+     ,.sret2_o(sret2_lo)
+     ,.wfi2_o(wfi2_lo)
+     ,.sfence_vma2_o(sfence_vma2_lo)
      );
 
-  bp_be_instr_decoder
-   #(.bp_params_p(bp_params_p))
-   instr_decoder2
-    (.instr_i(fe_queue2_lo.msg.fetch.instr)
-     ,.decode_info_i(decode_info_i)
 
-     ,.decode_o(instr_decoded2)
-     ,.imm_o(decoded_imm2_lo)
-
-     ,.illegal_instr_o(illegal_instr2_lo)
-     ,.ecall_m_o(ecall_m2_lo)
-     ,.ecall_s_o(ecall_s2_lo)
-     ,.ecall_u_o(ecall_u2_lo)
-     ,.ebreak_o(ebreak2_lo)
-     ,.dbreak_o(dbreak2_lo)
-     ,.dret_o(dret2_lo)
-     ,.mret_o(mret2_lo)
-     ,.sret_o(sret2_lo)
-     ,.wfi_o(wfi2_lo)
-     ,.sfence_vma_o(sfence_vma2_lo)
-     );
 
   //doubled
-  wire fe_exc_not_instr1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == e_fe_exception);
-  wire fe_exc_not_instr2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == e_fe_exception);
+  wire fe_exc_not_instr1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == 1);
+  wire fe_exc_not_instr2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == 1);
 
   //doubled
   wire [vaddr_width_p-1:0] fe_exc_vaddr1_li = fe_queue1_lo.msg.exception.vaddr;
@@ -240,12 +237,12 @@ module bp_be_scheduler
   wire [dpath_width_gp-1:0] be_exc_data_li = ptw_fill_pkt_cast_i.entry;
   
   //doubled
-  wire fe_instr_not_exc1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == e_fe_fetch);
-  wire fe_instr_not_exc2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == e_fe_fetch);
+  wire fe_instr_not_exc1_li = fe_queue_yumi1_li & (fe_queue1_lo.msg_type == 0);
+  wire fe_instr_not_exc2_li = fe_queue_yumi2_li & (fe_queue2_lo.msg_type == 0);
   
   // no need to be doubled for now
-  assign fe_queue_yumi1_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v1_i & ~be_exc_not_instr_li;
-  assign fe_queue_yumi2_li = ~suppress_iss_i & fe_queue_v_lo & dispatch_v2_i & ~be_exc_not_instr_li;
+  assign fe_queue_yumi1_li = ~suppress_iss_i & fe_queue_v1_lo & dispatch_v1_i & ~be_exc_not_instr_li;
+  assign fe_queue_yumi2_li = ~suppress_iss_i & fe_queue_v2_lo & dispatch_v2_i & ~be_exc_not_instr_li;
   
 
   bp_be_dispatch_pkt_s dispatch_pkt1, dispatch_pkt2;// doubled
@@ -257,17 +254,17 @@ module bp_be_scheduler
       isd_status1_cast_o.v        = fe_queue_yumi1_li;
       isd_status1_cast_o.pc       = fe_queue1_lo.msg.fetch.pc;
       isd_status1_cast_o.branch_metadata_fwd = fe_queue1_lo.msg.fetch.branch_metadata_fwd;
-      isd_status1_cast_o.fence_v  = fe_queue_v_lo & issue_pkt1.fence_v;
-      isd_status1_cast_o.csr_v    = fe_queue_v_lo & issue_pkt1.csr_v;
-      isd_status1_cast_o.mem_v    = fe_queue_v_lo & issue_pkt1.mem_v;
-      isd_status1_cast_o.long_v   = fe_queue_v_lo & issue_pkt1.long_v;
-      isd_status1_cast_o.irs1_v   = fe_queue_v_lo & issue_pkt1.irs1_v;
-      isd_status1_cast_o.frs1_v   = fe_queue_v_lo & issue_pkt1.frs1_v;
+      isd_status1_cast_o.fence_v  = fe_queue_v1_lo & issue_pkt1.fence_v;
+      isd_status1_cast_o.csr_v    = fe_queue_v1_lo & issue_pkt1.csr_v;
+      isd_status1_cast_o.mem_v    = fe_queue_v1_lo & issue_pkt1.mem_v;
+      isd_status1_cast_o.long_v   = fe_queue_v1_lo & issue_pkt1.long_v;
+      isd_status1_cast_o.irs1_v   = fe_queue_v1_lo & issue_pkt1.irs1_v;
+      isd_status1_cast_o.frs1_v   = fe_queue_v1_lo & issue_pkt1.frs1_v;
       isd_status1_cast_o.rs1_addr = fe_queue1_lo.msg.fetch.instr.t.fmatype.rs1_addr;
-      isd_status1_cast_o.irs2_v   = fe_queue_v_lo & issue_pkt1.irs2_v;
-      isd_status1_cast_o.frs2_v   = fe_queue_v_lo & issue_pkt1.frs2_v;
+      isd_status1_cast_o.irs2_v   = fe_queue_v1_lo & issue_pkt1.irs2_v;
+      isd_status1_cast_o.frs2_v   = fe_queue_v1_lo & issue_pkt1.frs2_v;
       isd_status1_cast_o.rs2_addr = fe_queue1_lo.msg.fetch.instr.t.fmatype.rs2_addr;
-      isd_status1_cast_o.frs3_v   = fe_queue_v_lo & issue_pkt1.frs3_v;
+      isd_status1_cast_o.frs3_v   = fe_queue_v1_lo & issue_pkt1.frs3_v;
       isd_status1_cast_o.rs3_addr = fe_queue1_lo.msg.fetch.instr.t.fmatype.rs3_addr;
       isd_status1_cast_o.rd_addr  = fe_queue1_lo.msg.fetch.instr.t.fmatype.rd_addr;
       isd_status1_cast_o.iwb_v    = instr_decoded1.irf_w_v;
@@ -277,17 +274,17 @@ module bp_be_scheduler
       isd_status2_cast_o.v        = fe_queue_yumi2_li;
       isd_status2_cast_o.pc       = fe_queue2_lo.msg.fetch.pc;
       isd_status2_cast_o.branch_metadata_fwd = fe_queue2_lo.msg.fetch.branch_metadata_fwd;
-      isd_status2_cast_o.fence_v  = fe_queue_v_lo & issue_pkt2.fence_v;
-      isd_status2_cast_o.csr_v    = fe_queue_v_lo & issue_pkt2.csr_v;
-      isd_status2_cast_o.mem_v    = fe_queue_v_lo & issue_pkt2.mem_v;
-      isd_status2_cast_o.long_v   = fe_queue_v_lo & issue_pkt2.long_v;
-      isd_status2_cast_o.irs1_v   = fe_queue_v_lo & issue_pkt2.irs1_v;
-      isd_status2_cast_o.frs1_v   = fe_queue_v_lo & issue_pkt2.frs1_v;
+      isd_status2_cast_o.fence_v  = fe_queue_v2_lo & issue_pkt2.fence_v;
+      isd_status2_cast_o.csr_v    = fe_queue_v2_lo & issue_pkt2.csr_v;
+      isd_status2_cast_o.mem_v    = fe_queue_v2_lo & issue_pkt2.mem_v;
+      isd_status2_cast_o.long_v   = fe_queue_v2_lo & issue_pkt2.long_v;
+      isd_status2_cast_o.irs1_v   = fe_queue_v2_lo & issue_pkt2.irs1_v;
+      isd_status2_cast_o.frs1_v   = fe_queue_v2_lo & issue_pkt2.frs1_v;
       isd_status2_cast_o.rs1_addr = fe_queue2_lo.msg.fetch.instr.t.fmatype.rs1_addr;
-      isd_status2_cast_o.irs2_v   = fe_queue_v_lo & issue_pkt2.irs2_v;
-      isd_status2_cast_o.frs2_v   = fe_queue_v_lo & issue_pkt2.frs2_v;
+      isd_status2_cast_o.irs2_v   = fe_queue_v2_lo & issue_pkt2.irs2_v;
+      isd_status2_cast_o.frs2_v   = fe_queue_v2_lo & issue_pkt2.frs2_v;
       isd_status2_cast_o.rs2_addr = fe_queue2_lo.msg.fetch.instr.t.fmatype.rs2_addr;
-      isd_status2_cast_o.frs3_v   = fe_queue_v_lo & issue_pkt2.frs3_v;
+      isd_status2_cast_o.frs3_v   = fe_queue_v2_lo & issue_pkt2.frs3_v;
       isd_status2_cast_o.rs3_addr = fe_queue2_lo.msg.fetch.instr.t.fmatype.rs3_addr;
       isd_status2_cast_o.rd_addr  = fe_queue2_lo.msg.fetch.instr.t.fmatype.rd_addr;
       isd_status2_cast_o.iwb_v    = instr_decoded2.irf_w_v;
@@ -295,13 +292,13 @@ module bp_be_scheduler
 
       // Form dispatch packet (doubled)
       dispatch_pkt1 = '0;
-      dispatch_pkt1.v        = (fe_queue_yumi1_li & ~poison_isd_i) || be_exc_not_instr_li;
+      dispatch_pkt1.v        = fe_queue_yumi1_li || be_exc_not_instr_li;//(fe_queue_yumi1_li & ~poison_isd_i) || be_exc_not_instr_li;
       dispatch_pkt1.queue_v  = fe_queue_yumi1_li;
       dispatch_pkt1.pc       = expected_npc_i;
       dispatch_pkt1.instr    = fe_queue1_lo.msg.fetch.instr;
 
       dispatch_pkt2 = '0;
-      dispatch_pkt2.v        = (fe_queue_yumi2_li & ~poison_isd_i) || be_exc_not_instr_li;
+      dispatch_pkt2.v        = fe_queue_yumi2_li || be_exc_not_instr_li;//(fe_queue_yumi2_li & ~poison_isd_i) || be_exc_not_instr_li;
       dispatch_pkt2.queue_v  = fe_queue_yumi2_li;
       dispatch_pkt2.pc       = expected_npc_i;
       dispatch_pkt2.instr    = fe_queue2_lo.msg.fetch.instr;

@@ -387,7 +387,7 @@ module testbench
            ,.memsize_i(testbench.cosim_memsize_p)
            ,.amo_en_i(testbench.amo_en_p == 1)
 
-           ,.decode_i(calculator.reservation_n.decode)
+           ,.decode_i(calculator.reservation_n_1.decode)
 
            ,.is_debug_mode_i(calculator.pipe_sys.csr.is_debug_mode)
            ,.commit_pkt_i(calculator.commit_pkt_cast_o)
@@ -397,13 +397,13 @@ module testbench
            ,.mcause_i(calculator.pipe_sys.csr.mcause_lo)
            ,.scause_i(calculator.pipe_sys.csr.scause_lo)
 
-           ,.ird_w_v_i(scheduler.iwb_pkt_cast_i.ird_w_v)
-           ,.ird_addr_i(scheduler.iwb_pkt_cast_i.rd_addr)
-           ,.ird_data_i(scheduler.iwb_pkt_cast_i.rd_data)
+           ,.ird_w_v_i(scheduler.iwb_pkt1_cast_i.ird_w_v)
+           ,.ird_addr_i(scheduler.iwb_pkt1_cast_i.rd_addr)
+           ,.ird_data_i(scheduler.iwb_pkt1_cast_i.rd_data)
 
-           ,.frd_w_v_i(scheduler.fwb_pkt_cast_i.frd_w_v)
-           ,.frd_addr_i(scheduler.fwb_pkt_cast_i.rd_addr)
-           ,.frd_data_i(scheduler.fwb_pkt_cast_i.rd_data)
+           ,.frd_w_v_i(scheduler.fwb_pkt1_cast_i.frd_w_v)
+           ,.frd_addr_i(scheduler.fwb_pkt1_cast_i.rd_addr)
+           ,.frd_data_i(scheduler.fwb_pkt1_cast_i.rd_data)
 
            ,.cache_req_yumi_i(calculator.pipe_mem.dcache.cache_req_yumi_i)
            ,.cache_req_complete_i(calculator.pipe_mem.dcache.cache_req_complete_i)
@@ -453,12 +453,12 @@ module testbench
 
            ,.mhartid_i(be.calculator.pipe_sys.csr.cfg_bus_cast_i.core_id)
 
-           ,.itlb_clear_i(fe.immu.tlb.flush_i)
-           ,.itlb_fill_v_i(fe.immu.tlb.w_v_li)
-           ,.itlb_fill_g_i(fe.immu.tlb.entry.gigapage)
-           ,.itlb_vtag_i(fe.immu.tlb.vtag_i)
-           ,.itlb_entry_i(fe.immu.tlb.entry_i)
-           ,.itlb_r_v_i(fe.immu.tlb.r_v_li)
+           ,.itlb_clear_i(fe.immu1.tlb.flush_i)
+           ,.itlb_fill_v_i(fe.immu1.tlb.w_v_li)
+           ,.itlb_fill_g_i(fe.immu1.tlb.entry.gigapage)
+           ,.itlb_vtag_i(fe.immu1.tlb.vtag_i)
+           ,.itlb_entry_i(fe.immu1.tlb.entry_i)
+           ,.itlb_r_v_i(fe.immu1.tlb.r_v_li)
 
            ,.dtlb_clear_i(be.calculator.pipe_mem.dmmu.tlb.flush_i)
            ,.dtlb_fill_v_i(be.calculator.pipe_mem.dmmu.tlb.w_v_li)
@@ -478,26 +478,26 @@ module testbench
 
           ,.mhartid_i(be.calculator.pipe_sys.csr.cfg_bus_cast_i.core_id)
 
-          ,.fe_queue_ready_i(fe.fe_queue_ready_i)
+          ,.fe_queue_ready_i(fe.fe_queue_ready_i1)
           ,.fe_icache_ready_i(fe.icache.ready_o)
      
           ,.if2_v_i(fe.v_if2_r)
           ,.br_ovr_i(fe.pc_gen.ovr_taken)
           ,.ret_ovr_i(fe.pc_gen.ovr_ret)
-          ,.icache_data_v_i(fe.icache.data_v_o)
+          ,.icache_data_v_i(fe.icache.data_v_o1)
 
           ,.fe_cmd_nonattaboy_i(fe.fe_cmd_yumi_o & ~fe.attaboy_v) 
           ,.fe_cmd_fence_i(be.director.is_fence)
-          ,.fe_queue_empty_i(~be.scheduler.fe_queue_fifo.fe_queue_v_o)
+          ,.fe_queue_empty_i(~be.scheduler.fe_queue_fifo.fe_queue_v1_o)
 
           ,.mispredict_i(be.director.npc_mismatch_v)
           ,.dcache_miss_i(~be.calculator.pipe_mem.dcache.ready_o)
-          ,.long_haz_i(be.detector.long_haz_v)
-          ,.control_haz_i(be.detector.control_haz_v)
-          ,.data_haz_i(be.detector.data_haz_v)
+          ,.long_haz_i(be.detector.long_haz1_v)
+          ,.control_haz_i(be.detector.control_haz1_v)
+          ,.data_haz_i(be.detector.data_haz1_v)
           ,.aux_dep_i((be.detector.dep_status_r[0].aux_iwb_v
                      | be.detector.dep_status_r[0].aux_fwb_v
-                     ) & be.detector.data_haz_v
+                     ) & be.detector.data_haz1_v
                     )
           ,.load_dep_i((be.detector.dep_status_r[0].emem_iwb_v
                         | be.detector.dep_status_r[0].fmem_iwb_v
@@ -505,31 +505,31 @@ module testbench
                         | be.detector.dep_status_r[0].emem_fwb_v
                         | be.detector.dep_status_r[0].fmem_fwb_v
                         | be.detector.dep_status_r[1].fmem_fwb_v
-                        ) & be.detector.data_haz_v
+                        ) & be.detector.data_haz1_v
                        )
           ,.mul_dep_i((be.detector.dep_status_r[0].mul_iwb_v
                        | be.detector.dep_status_r[1].mul_iwb_v
                        | be.detector.dep_status_r[2].mul_iwb_v
-                       ) & be.detector.data_haz_v
+                       ) & be.detector.data_haz1_v
                       )
           ,.fma_dep_i((be.detector.dep_status_r[0].fma_fwb_v
                      | be.detector.dep_status_r[1].fma_fwb_v
                      | be.detector.dep_status_r[2].fma_fwb_v
                      | be.detector.dep_status_r[3].fma_fwb_v
-                     ) & be.detector.data_haz_v
+                     ) & be.detector.data_haz1_v
                     )
-          ,.sb_iraw_dep_i((be.detector.irs1_sb_raw_haz_v
-                         | be.detector.irs2_sb_raw_haz_v
-                         ) & be.detector.data_haz_v
+          ,.sb_iraw_dep_i((be.detector.irs1_sb_raw_haz1_v
+                         | be.detector.irs2_sb_raw_haz1_v
+                         ) & be.detector.data_haz1_v
                         )
-          ,.sb_fraw_dep_i((be.detector.frs1_sb_raw_haz_v
-                         | be.detector.frs2_sb_raw_haz_v
-                         | be.detector.frs3_sb_raw_haz_v
-                         ) & be.detector.data_haz_v
+          ,.sb_fraw_dep_i((be.detector.frs1_sb_raw_haz1_v
+                         | be.detector.frs2_sb_raw_haz1_v
+                         | be.detector.frs3_sb_raw_haz1_v
+                         ) & be.detector.data_haz1_v
                         )
-          ,.sb_iwaw_dep_i(be.detector.ird_sb_waw_haz_v & be.detector.data_haz_v)
-          ,.sb_fwaw_dep_i(be.detector.frd_sb_waw_haz_v & be.detector.data_haz_v)
-          ,.struct_haz_i(be.detector.struct_haz_v)
+          ,.sb_iwaw_dep_i(be.detector.ird_sb_waw_haz1_v & be.detector.data_haz1_v)
+          ,.sb_fwaw_dep_i(be.detector.frd_sb_waw_haz1_v & be.detector.data_haz1_v)
+          ,.struct_haz_i(be.detector.struct_haz1_v)
           ,.idiv_haz_i(~be.detector.idiv_ready_i & be.detector.isd_status_cast_i.long_v)
           ,.fdiv_haz_i(~be.detector.fdiv_ready_i & be.detector.isd_status_cast_i.long_v)
           ,.ptw_busy_i(be.detector.ptw_busy_i)

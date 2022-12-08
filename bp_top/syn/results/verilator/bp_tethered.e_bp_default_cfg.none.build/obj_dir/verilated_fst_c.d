@@ -1,0 +1,22 @@
+verilated_fst_c.o: \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_fst_c.cpp \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilatedos.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_config.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_types.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_funcs.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_fst_c.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_trace.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_trace_defs.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fstapi.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fastlz.c \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fastlz.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fastlz.c \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fstapi.c \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fst_config.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/fstapi.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/lz4.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/gtkwave/lz4.c \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_trace_imp.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_intrinsics.h \
+ /home/nsantos/Desktop/black-parrot-sim/tools/install/share/verilator/include/verilated_threads.h

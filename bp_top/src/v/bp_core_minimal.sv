@@ -89,8 +89,8 @@ module bp_core_minimal
 
   `bp_cast_i(bp_cfg_bus_s, cfg_bus);
 
-  bp_fe_queue_s fe_queue_li, fe_queue_lo;
-  logic fe_queue_v_li, fe_queue_ready_lo;
+  bp_fe_queue_s fe_queue_li, fe_queue_lo, fe_queue_li2;
+  logic fe_queue_v_li, fe_queue_ready_lo, fe_queue_v_li2;
   bp_fe_cmd_s fe_cmd_lo;
   logic fe_cmd_v_lo, fe_cmd_yumi_li;
 
@@ -102,9 +102,12 @@ module bp_core_minimal
 
      ,.cfg_bus_i(cfg_bus_cast_i)
 
-     ,.fe_queue_o(fe_queue_li)
-     ,.fe_queue_v_o(fe_queue_v_li)
-     ,.fe_queue_ready_i(fe_queue_ready_lo)
+     ,.fe_queue_o1(fe_queue_li)
+     ,.fe_queue_o2(fe_queue_li2)
+     ,.fe_queue_v_o1(fe_queue_v_li)
+     ,.fe_queue_v_o2(fe_queue_v_li2)
+     ,.fe_queue_ready_i1(fe_queue_ready_lo)
+     ,.fe_queue_ready_i2(fe_queue_ready_lo)
 
      ,.fe_cmd_i(fe_cmd_lo)
      ,.fe_cmd_v_i(fe_cmd_v_lo)
@@ -146,8 +149,10 @@ module bp_core_minimal
 
      ,.cfg_bus_i(cfg_bus_cast_i)
 
-     ,.fe_queue_i(fe_queue_li)
-     ,.fe_queue_v_i(fe_queue_v_li)
+     ,.fe_queue1_i(fe_queue_li)
+     ,.fe_queue2_i(fe_queue_li2)
+     ,.fe_queue_v1_i(fe_queue_v_li)
+     ,.fe_queue_v2_i(fe_queue_v_li2)
      ,.fe_queue_ready_o(fe_queue_ready_lo)
 
      ,.fe_cmd_o(fe_cmd_lo)
@@ -189,4 +194,3 @@ module bp_core_minimal
      );
 
 endmodule
-

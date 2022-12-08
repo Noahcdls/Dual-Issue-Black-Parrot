@@ -185,7 +185,7 @@ module bp_be_pipe_sys
   //valid retire without exception
   //I guess this is an instruction returns properly without exception
   wire instret_li = retire_v_i & ~|retire_exception_i;
-  wire instret_li = retire_v_i2 & ~|retire_exception_i2;
+  wire instret_li2 = retire_v_i2 & ~|retire_exception_i2;
   assign retire_pkt =
     '{v          : retire_v_i
       ,queue_v   : retire_queue_v_i
@@ -213,4 +213,3 @@ module bp_be_pipe_sys
       };
 
 endmodule
-

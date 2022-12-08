@@ -149,9 +149,12 @@ module bp_be_calculator_top
   logic pipe_mem_late_fwb_pkt_v, pipe_mem_late_fwb_pkt_yumi;
 
   // Generating match vector for bypass
-  logic [2:0][pipe_stage_els_lp-1:0] match1_rs1, match1_rs2;
-  logic [2:0][pipe_stage_els_lp-1:0] match2_rs1, match2_rs2;
-  logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data1, forward_data2;
+  logic [2:0][pipe_stage_els_lp-1:0] match1_rs1;
+  logic [2:0][pipe_stage_els_lp-1:0] match1_rs2;
+  logic [2:0][pipe_stage_els_lp-1:0] match2_rs1; 
+  logic [2:0][pipe_stage_els_lp-1:0] match2_rs2;
+  logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data1;
+  logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data2;
   for (genvar i = 0; i < pipe_stage_els_lp; i++)
     begin : forward_match
       // ?? also double match_rs to match_rs2
@@ -160,34 +163,34 @@ module bp_be_calculator_top
       //valid dispatch in queue and not fp and int write, and dispatch's fma rs addr is actively being computed
       //same for fp
       //tries to detect if upcoming fma instr are being written to and we need to wait
-      assign match1_rs1[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)))
-                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)));
-      assign match1_rs1[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)))
-                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)));
-      assign match1_rs1[2][i] = ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs3_fp_v & (comp_stage_r1[i].frd_w_v)
-       & ((dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r1[i].rd_addr)));
+      assign match1_rs1[0][i] = ((i < 4) & dispatch_pkt1_cast_i.queue_v & ~dispatch_pkt1_cast_i.rs1_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt1_cast_i.queue_v & dispatch_pkt1_cast_i.rs1_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)));
+      assign match1_rs1[1][i] = ((i < 4) & dispatch_pkt1_cast_i.queue_v & ~dispatch_pkt1_cast_i.rs2_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt1_cast_i.queue_v & dispatch_pkt1_cast_i.rs2_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)));
+      assign match1_rs1[2][i] = ((i > 0) & dispatch_pkt1_cast_i.queue_v & dispatch_pkt1_cast_i.rs3_fp_v & (comp_stage_r1[i].frd_w_v)
+       & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r1[i].rd_addr)));
 
-      assign match1_rs2[0][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)))
-                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs1_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)));
-      assign match1_rs2[1][i] = ((i < 4) & dispatch_pkt_cast_i.queue_v & ~dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)))
-                              || ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs2_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)));
-      assign match1_rs2[2][i] = ((i > 0) & dispatch_pkt_cast_i.queue_v & dispatch_pkt_cast_i.rs3_fp_v & (comp_stage_r2[i].frd_w_v)
-       & ((dispatch_pkt_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r2[i].rd_addr)));
+      assign match1_rs2[0][i] = ((i < 4) & dispatch_pkt1_cast_i.queue_v & ~dispatch_pkt1_cast_i.rs1_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt1_cast_i.queue_v & dispatch_pkt1_cast_i.rs1_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)));
+      assign match1_rs2[1][i] = ((i < 4) & dispatch_pkt1_cast_i.queue_v & ~dispatch_pkt1_cast_i.rs2_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)))
+                              || ((i > 0) & dispatch_pkt1_cast_i.queue_v & dispatch_pkt1_cast_i.rs2_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)));
+      assign match1_rs2[2][i] = ((i > 0) & dispatch_pkt1_cast_i.queue_v & dispatch_pkt1_cast_i.rs3_fp_v & (comp_stage_r2[i].frd_w_v)
+       & ((dispatch_pkt1_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r2[i].rd_addr)));
 
 
 
-      assign match2_rs[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)))
+      assign match2_rs1[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)))
                               || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r1[i].rd_addr)));
-      assign match2_rs[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)))
+      assign match2_rs1[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r1[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)))
                               || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r1[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r1[i].rd_addr)));
-      assign match2_rs[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & (comp_stage_r1[i].frd_w_v)
+      assign match2_rs1[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & (comp_stage_r1[i].frd_w_v)
        & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r1[i].rd_addr)));
 
-      assign match2_rs[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)))
+      assign match2_rs2[0][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)))
                               || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs1_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs1_addr == comp_stage_r2[i].rd_addr)));
-      assign match2_rs[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)))
+      assign match2_rs2[1][i] = ((i < 4) & dispatch_pkt2_cast_i.queue_v & ~dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r2[i].ird_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)))
                               || ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs2_fp_v & (comp_stage_r2[i].frd_w_v) & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs2_addr == comp_stage_r2[i].rd_addr)));
-      assign match2_rs[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & (comp_stage_r2[i].frd_w_v)
+      assign match2_rs2[2][i] = ((i > 0) & dispatch_pkt2_cast_i.queue_v & dispatch_pkt2_cast_i.rs3_fp_v & (comp_stage_r2[i].frd_w_v)
        & ((dispatch_pkt2_cast_i.instr.t.fmatype.rs3_addr == comp_stage_r2[i].rd_addr)));
 
       assign forward_data1[i] = comp_stage_n1[i+1].rd_data;
@@ -198,11 +201,11 @@ module bp_be_calculator_top
   logic [2:0][dpath_width_gp-1:0] bypass2_rs;
   //?? wire [2:0][dpath_width_gp-1:0] dispatch_data2 = {dispatch_pkt2_cast_i.imm, dispatch_pkt2_cast_i.rs2, dispatch_pkt2_cast_i.rs1};
   wire [2:0][dpath_width_gp-1:0] dispatch_data2 = {dispatch_pkt2_cast_i.imm, dispatch_pkt2_cast_i.rs2, dispatch_pkt2_cast_i.rs1};
-  wire [2:0][dpath_width_gp-1:0] dispatch_data = {dispatch_pkt_cast_i.imm, dispatch_pkt_cast_i.rs2, dispatch_pkt_cast_i.rs1};
+  wire [2:0][dpath_width_gp-1:0] dispatch_data = {dispatch_pkt1_cast_i.imm, dispatch_pkt1_cast_i.rs2, dispatch_pkt1_cast_i.rs1};
   for (genvar i = 0; i < 3; i++)
     begin : pencode
-      logic [pipe_stage_els_lp:0] match1_rs1_onehot, match1_rs2_onehot;
-      logic [pipe_stage_els_lp:0] match2_rs1_onehot, match2_rs2_onehot;
+      logic [pipe_stage_els_lp:0] match1_rs1_onehot, match1_rs2_onehot, match1_rs_onehot;
+      logic [pipe_stage_els_lp:0] match2_rs1_onehot, match2_rs2_onehot, match2_rs_onehot;
       logic [pipe_stage_els_lp-1:0][dpath_width_gp-1:0] forward_data_final1, forward_data_final2;
       //peform one hot encoding on elements to find where values are hidden
       bsg_priority_encode_one_hot_out
@@ -221,11 +224,11 @@ module bp_be_calculator_top
          ,.v_o()
          );
 
-      forward_data_final1 = (match1_rs1[i] != 0) ? forward_data1 : forward_data2;
-      logic match1_rs_onehot = (match1_rs1[i] != 0) ? match1_rs1_onehot : match1_rs2_onehot;
-      bsg_mux_one_hot1
+      assign forward_data_final1 = (match1_rs1[i] != 0) ? forward_data1 : forward_data2;
+      assign match1_rs_onehot = (match1_rs1[i] != 0) ? match1_rs1_onehot : match1_rs2_onehot;
+      bsg_mux_one_hot
        #(.width_p(dpath_width_gp), .els_p(pipe_stage_els_lp+1))
-       fwd_mux_oh
+       fwd_mux_oh1
         (.data_i({dispatch_data[i], forward_data_final1})
          ,.sel_one_hot_i(match1_rs_onehot)
          ,.data_o(bypass_rs[i])
@@ -247,11 +250,11 @@ module bp_be_calculator_top
          ,.v_o()
          );
 
-      forward_data_final2 = (match2_rs1[i] != 0) ? forward_data1 : forward_data2;
-      logic match2_rs_onehot = (match2_rs1[i] != 0) ? match2_rs1_onehot : match2_rs2_onehot;
-      bsg_mux_one_hot2
+      assign forward_data_final2 = (match2_rs1[i] != 0) ? forward_data1 : forward_data2;
+      assign match2_rs_onehot = (match2_rs1[i] != 0) ? match2_rs1_onehot : match2_rs2_onehot;
+      bsg_mux_one_hot
        #(.width_p(dpath_width_gp), .els_p(pipe_stage_els_lp+1))
-       fwd_mux_oh
+       fwd_mux_oh2
         (.data_i({dispatch_data2[i], forward_data_final2})
          ,.sel_one_hot_i(match2_rs_onehot)
          ,.data_o(bypass2_rs[i])
@@ -278,15 +281,22 @@ module bp_be_calculator_top
       reservation_n_2.rs2    = bypass2_rs[1];
       reservation_n_2.imm    = bypass2_rs[2];
     end
-  wire ctl_reservation = reservation_r_1.decode.pipe_ctl_v ? reservation_r_1 : reservation_r_2;
-  wire sys_reservation = reservation_r_1.decode.pipe_sys_v ? reservation_r_1 : reservation_r_2;
-  wire int_reservation = reservation_r_1.decode.pipe_int_v ? reservation_r_1 : reservation_r_2;
-  wire aux_reservation = reservation_r_1.decode.pipe_aux_v ? reservation_r_1 : reservation_r_2;
-  wire mem_reservation = (reservation_r_1.decode.pipe_mem_early_v || reservation_r_1.decode.pipe_mem_final_v)  ? reservation_r_1 : reservation_r_2;
-  wire fma_reservation = (reservation_r_1.decode.pipe_fma_v || reservation_r_1.decode.pipe_mul_v) ? reservation_r_1 : reservation_r_2;
-  wire long_reservation = reservation_r_1.decode.pipe_long_v ? reservation_r_1 : reservation_r_2;
+
+  bp_be_dispatch_pkt_s  ctl_reservation, sys_reservation, int_reservation, aux_reservation, mem_reservation, fma_reservation, long_reservation;
+  always_comb
+    begin
+      ctl_reservation = reservation_r_1.decode.pipe_ctl_v ? reservation_r_1 : reservation_r_2.decode.pipe_ctl_v ? reservation_r_2 : reservation_r_1;
+      sys_reservation = reservation_r_1.decode.pipe_sys_v ? reservation_r_1 : reservation_r_2.decode.pipe_sys_v ? reservation_r_2 : reservation_r_1;
+      int_reservation = reservation_r_1.decode.pipe_int_v ? reservation_r_1 : reservation_r_2.decode.pipe_int_v ? reservation_r_2 : reservation_r_1;
+      aux_reservation = reservation_r_1.decode.pipe_aux_v ? reservation_r_1 : reservation_r_2;
+      mem_reservation = (reservation_r_1.decode.pipe_mem_early_v || reservation_r_1.decode.pipe_mem_final_v)  ? reservation_r_1 :
+      (reservation_r_2.decode.pipe_mem_early_v || reservation_r_2.decode.pipe_mem_final_v) ? reservation_r_2 : reservation_r_1;
+      fma_reservation = (reservation_r_1.decode.pipe_fma_v || reservation_r_1.decode.pipe_mul_v) ? reservation_r_1 
+      : (reservation_r_2.decode.pipe_fma_v || reservation_r_2.decode.pipe_mul_v) ? reservation_r_2 : reservation_r_1;
+      long_reservation = reservation_r_1.decode.pipe_long_v ? reservation_r_1 : reservation_r_2.decode.pipe_long_v ? reservation_r_2 : reservation_r_1;
+    end
   //?? wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
-  wire injection = dispatch_pkt_cast_i.v & ~dispatch_pkt_cast_i.queue_v;
+  wire injection = dispatch_pkt1_cast_i.v & ~dispatch_pkt1_cast_i.queue_v;
   wire injection2 = dispatch_pkt2_cast_i.v & ~dispatch_pkt2_cast_i.queue_v;
 
   bsg_dff
@@ -538,7 +548,7 @@ module bp_be_calculator_top
             : comp_stage_r[i-1];
         end
       // Injected instructions can carry a payload in rs2
-      comp_stage_n[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : injection2 ? dispatch_pkt2_cast_i.rs2 : '0;
+      comp_stage_n[0].rd_data    |= injection                ? dispatch_pkt1_cast_i.rs2  : injection2 ? dispatch_pkt2_cast_i.rs2 : '0;
       comp_stage_n[1].rd_data    |= pipe_int_data_lo_v       ? pipe_int_data_lo         : '0;
       comp_stage_n[1].rd_data    |= pipe_ctl_data_lo_v       ? pipe_ctl_data_lo         : '0;
       comp_stage_n[1].rd_data    |= pipe_sys_data_lo_v       ? pipe_sys_data_lo         : '0;
@@ -601,7 +611,7 @@ module bp_be_calculator_top
             : comp_stage_r1[i-1];
         end
       // Injected instructions can carry a payload in rs2
-      comp_stage_n1[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : '0;
+      comp_stage_n1[0].rd_data    |= injection                ? dispatch_pkt1_cast_i.rs2  : '0;
       comp_stage_n1[1].rd_data    |= (pipe_int_data_lo_v & comp_stage_pkt1[1].decode.pipe_int_v)       ? pipe_int_data_lo         : '0;
       comp_stage_n1[1].rd_data    |= (pipe_ctl_data_lo_v & comp_stage_pkt1[1].decode.pipe_ctl_v)     ? pipe_ctl_data_lo         : '0;
       comp_stage_n1[1].rd_data    |= (pipe_sys_data_lo_v & comp_stage_pkt1[1].decode.pipe_sys_v)       ? pipe_sys_data_lo         : '0;
@@ -672,7 +682,7 @@ module bp_be_calculator_top
             : comp_stage_r2[i-1];
         end
       // Injected instructions can carry a payload in rs2
-      comp_stage_n2[0].rd_data    |= injection                ? dispatch_pkt_cast_i.rs2  : '0;
+      comp_stage_n2[0].rd_data    |= injection                ? dispatch_pkt2_cast_i.rs2  : '0;
       comp_stage_n2[1].rd_data    |= (pipe_int_data_lo_v & comp_stage_pkt2[1].decode.pipe_int_v)       ? pipe_int_data_lo         : '0;
       comp_stage_n2[1].rd_data    |= (pipe_ctl_data_lo_v & comp_stage_pkt2[1].decode.pipe_ctl_v)     ? pipe_ctl_data_lo         : '0;
       comp_stage_n2[1].rd_data    |= (pipe_sys_data_lo_v & comp_stage_pkt2[1].decode.pipe_sys_v)       ? pipe_sys_data_lo         : '0;
@@ -745,7 +755,7 @@ module bp_be_calculator_top
           exc_stage_n[0].spec                   |= (reservation_n_1.special | reservation_n_2.special);
           exc_stage_n[0].exc                    |= (reservation_n_1.exception | reservation_n_2.exception);
 
-          exc_stage_n[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo1;
+          exc_stage_n[1].exc.illegal_instr      |= pipe_sys_illegal_instr_lo;
           exc_stage_n[1].spec.csrw              |= pipe_sys_csrw_lo & comp_stage_n1;
 
           exc_stage_n[1].exc.dtlb_store_miss    |= pipe_mem_dtlb_store_miss_lo;
@@ -784,17 +794,17 @@ module bp_be_calculator_top
         end
           //no npc writes from bad branching or csr states and none from reservation
           exc_stage_n1[0].v                       = reservation_n_1.v;
-          exc_stage_n1[0].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n1[1].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n1[2].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[0].v                      &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[1].v                      &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[2].v                      &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
           //after instr is all done that the instr returns properly
-          exc_stage_n1[3].v                      &= commit_pkt1_cast_o.instret;
+          exc_stage_n1[3].v                      &= commit_pkt_cast_o.instret;
           //reservation is indeed queued so it can be saved and returned
           exc_stage_n1[0].queue_v                 = reservation_n_1.queue_v;
-          exc_stage_n1[0].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n1[1].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n1[2].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n1[3].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[0].queue_v                &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[1].queue_v                &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[2].queue_v                &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n1[3].queue_v                &= ~commit_pkt_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
 
           //special and exception hold a bits for particular cases that we might as well combine
           exc_stage_n1[0].spec                   |= (reservation_n_1.special);
@@ -837,16 +847,16 @@ module bp_be_calculator_top
           exc_stage_n1[i] = (i == 0) ? '0 : exc_stage_r[i-1];
         end
           exc_stage_n2[0].v                       = reservation_n_2.v;
-          exc_stage_n2[0].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n2[1].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n2[2].v                      &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[0].v                      &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[1].v                      &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[2].v                      &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
           exc_stage_n2[3].v                      &= commit_pkt2_cast_o.instret;
 
           exc_stage_n2[0].queue_v                 = reservation_n_2.queue_v;
-          exc_stage_n2[0].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n2[1].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n2[2].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
-          exc_stage_n2[3].queue_v                &= ~commit_pkt1_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[0].queue_v                &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[1].queue_v                &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[2].queue_v                &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
+          exc_stage_n2[3].queue_v                &= ~commit_pkt2_cast_o.npc_w_v & ~commit_pkt2_cast_o.npc_w_v;
 
           //special and exception hold a bits for particular cases that we might as well combine
           exc_stage_n2[0].spec                   |= (reservation_n_2.special);

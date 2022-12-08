@@ -79,32 +79,39 @@ module bp_be_issue_queue
   wire roll = roll1 | roll2;
 
   assign rptr_jmp = roll // = commit_pkt_cast_i.npc_w_v
-                    ? (cptr_r - rptr_r + ((ptr_width_lp+1)'(deq) << 1))//if not pc, to the next line of cptr
-                    : read // read new instr 
+                    ? (cptr_r - rptr_r + ((ptr_width_lp+1)'(deq)))//if not pc, to the next line of cptr
+                    : fe_queue_yumi1_i & fe_queue_yumi2_i
                        ? ((ptr_width_lp+1)'(2))
+                       : fe_queue_yumi1_i
+                       ? ((ptr_width_lp+1)'(1))
                        : ((ptr_width_lp+1)'(0));
   assign wptr_jmp = clr
-                    ? (rptr_r - wptr_r + ((ptr_width_lp+1)'(read) << 1))//if clr, to the next line of rptr
-                    : enq // new instr inserted
+                    ? (rptr_r - wptr_r + ((ptr_width_lp+1)'(read)))//if clr, to the next line of rptr
+                    : enq1 & enq2 // new instr inserted
                        ? ((ptr_width_lp+1)'(2))
+                       : enq1
+                       ? ((ptr_width_lp+1)'(1))
                        : ((ptr_width_lp+1)'(0));
   
-  assign cptr_jmp = {deq, 1'b0}; //
+  assign cptr_jmp = deq1 & deq2 ? 2 : deq1 ? 1 : 0; //
 
   // reassign pointers
-  assign wptr1_n = wptr_n;
-  assign wptr2_n = wptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
-  assign wptr1_r = wptr_r;
-  assign wptr2_r = wptr_r + (ptr_width_lp)'(1);
+  // assign wptr1_n = wptr_n;
+  // assign wptr2_n = wptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
+  // assign wptr1_r = wptr_r;
+  // assign wptr2_r = wptr_r + (ptr_width_lp)'(1);
 
-  assign rptr1_n = roll1
-                   ?  rptr_n
-                   : roll2
-                      ? rptr_r + (read? )
-                      : ();
-  assign rptr2_n = rptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
-  assign rptr1_r = rptr_r;
-  assign rptr2_r = rptr_r + (ptr_width_lp)'(1);
+  // assign rptr1_n = roll1
+  //                  ?  rptr_n
+  //                  : roll2
+  //                     ? rptr_r + (read? )
+  //                     : ();
+  // assign rptr2_n = rptr_n + (ptr_width_lp)'(1); // should be fine since slot_p=2*fe_queue_fifo_els_p
+  // assign rptr1_r = rptr_r;
+  // assign rptr2_r = rptr_r + (ptr_width_lp)'(1);
+
+
+
 
   wire empty = (rptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
                & (rptr_r[ptr_width_lp] == wptr_r[ptr_width_lp]);
@@ -191,11 +198,13 @@ module bp_be_issue_queue
     ,.r_data_o(fe_queue_cast_o)
     );
   */
-
+wire [ptr_width_lp:0] wptr_r2 = wptr_r+1;
+wire [ptr_width_lp:0] rptr_r2 = rptr_r+1;
+wire [ptr_width_lp:0] rptr_n2 = rptr_n+1;
   
   // 2r2w queue_fifo_mem
   bsg_mem_multiport
-  #(.width_p($bits(bp_be_issue_pkt_s)), 
+  #(.width_p(fe_queue_width_lp), 
     .els_p(fe_queue_fifo_els_p), 
     .read_ports_p(2), 
     .write_ports_p(2))
@@ -204,11 +213,11 @@ module bp_be_issue_queue
     ,.w_reset_i(reset_i)
 
     ,.w_v_i({enq1,enq2})
-    ,.w_addr_i({wptr1_r[0+:ptr_width_lp],wptr2_r[0+:ptr_width_lp]})
+    ,.w_addr_i({wptr_r[0+:ptr_width_lp],wptr_r2[0+:ptr_width_lp]})
     ,.w_data_i({fe_queue1_cast_i,fe_queue2_cast_i})
 
     ,.r_v_i({(read & ~empty),(read & ~empty)})
-    ,.r_addr_i({rptr1_r[0+:ptr_width_lp],rptr2_r[0+:ptr_width_lp]})
+    ,.r_addr_i({rptr_r[0+:ptr_width_lp],rptr_r2[0+:ptr_width_lp]})
     ,.r_data_o({fe_queue1_cast_o,fe_queue2_cast_o})
 
     );
@@ -223,10 +232,10 @@ module bp_be_issue_queue
   assign instr2 = fe_queue2_cast_i.msg.fetch.instr;
 
   bp_be_issue_pkt_s issue_pkt1_li, issue_pkt1_lo, issue_pkt2_li, issue_pkt2_lo;
-  wire issue_v1 = (fe_queue_yumi1_i & ~empty_n) | roll_v_i | (fe_queue_v1_i & empty);
-  wire issue_v2 = (fe_queue_yumi2_i & ~empty_n) | roll_v_i | (fe_queue_v2_i & empty);
-  wire bypass_reg1 = (wptr1_r == rptr1_n);
-  wire bypass_reg2 = (wptr2_r == rptr2_n);
+  wire issue_v1 = (fe_queue_yumi1_i & ~empty_n) | roll_v1_i | (fe_queue_v1_i & empty);
+  wire issue_v2 = (fe_queue_yumi2_i & ~empty_n) | roll_v2_i | (fe_queue_v2_i & empty);
+  wire bypass_reg1 = (wptr_r == rptr_n);
+  wire bypass_reg2 = (wptr_r+1 == rptr_n+1);
   
   /*
   bsg_mem_1r1w
@@ -257,11 +266,11 @@ module bp_be_issue_queue
     ,.w_reset_i(reset_i)
 
     ,.w_v_i({enq1,enq2})
-    ,.w_addr_i({wptr1_r[0+:ptr_width_lp],wptr2_r[0+:ptr_width_lp]})
+    ,.w_addr_i({wptr_r[0+:ptr_width_lp],wptr_r2[0+:ptr_width_lp]})
     ,.w_data_i({issue_pkt1_li,issue_pkt2_li})
 
     ,.r_v_i({issue_v1,issue_v2})
-    ,.r_addr_i({rptr1_n[0+:ptr_width_lp],rptr2_n[0+:ptr_width_lp]})
+    ,.r_addr_i({rptr_n[0+:ptr_width_lp],rptr_n2[0+:ptr_width_lp]})
     ,.r_data_o({issue_pkt1_lo,issue_pkt2_lo})
 
     );
@@ -275,7 +284,7 @@ module bp_be_issue_queue
    issue_reg
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
-     ,.en_i(issue_v1 | issue_v2)
+     ,.en_i(issue_v1)
      ,.data_i({preissue_pkt1_o,preissue_pkt2_o})
      ,.data_o({issue_pkt1_o,issue_pkt2_o})
      );

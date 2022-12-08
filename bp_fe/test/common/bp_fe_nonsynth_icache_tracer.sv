@@ -24,13 +24,13 @@ module bp_fe_nonsynth_icache_tracer
    , input                                                freeze_i
    , input [mhartid_width_lp-1:0]                         mhartid_i
 
-   , input [icache_pkt_width_lp-1:0]                      icache_pkt_i
-   , input                                                v_i
+   , input [icache_pkt_width_lp-1:0]                      icache_pkt1_i
+   , input                                                v_i1
    , input                                                ready_o
 
-   , input [instr_width_gp-1:0]                           data_o
-   , input                                                data_v_o
-   , input                                                miss_v_o
+   , input [instr_width_gp-1:0]                           data_o1
+   , input                                                data_v_o1
+   , input                                                miss_v_o1
 
    , input [cache_req_width_lp-1:0]                       cache_req_o
    , input                                                cache_req_v_o
@@ -65,8 +65,8 @@ module bp_fe_nonsynth_icache_tracer
 
   `declare_bp_cache_engine_if(paddr_width_p, ctag_width_p, sets_p, assoc_p, dword_width_gp, block_width_p, fill_width_p, cache);
   `declare_bp_fe_icache_pkt_s(vaddr_width_p);
-  bp_fe_icache_pkt_s icache_pkt_cast_i;
-  assign icache_pkt_cast_i = icache_pkt_i;
+  bp_fe_icache_pkt_s icache_pkt1_cast_i;
+  assign icache_pkt1_cast_i = icache_pkt1_i;
 
   bp_cache_req_s cache_req_cast_o;
   bp_cache_req_metadata_s cache_req_metadata_cast_o;
@@ -114,8 +114,8 @@ module bp_fe_nonsynth_icache_tracer
 
   always_ff @(posedge clk_i)
     begin
-      if (ready_o & v_i)
-        $fwrite(file, "%12t | access: %p\n", $time, icache_pkt_cast_i);
+      if (ready_o & v_i1)
+        $fwrite(file, "%12t | access: %p\n", $time, icache_pkt1_cast_i);
 
       if (data_mem_pkt_yumi_o)
         $fwrite(file, "%12t | data_mem_pkt: %p\n", $time, data_mem_pkt_cast_i);
@@ -132,9 +132,9 @@ module bp_fe_nonsynth_icache_tracer
       if (stat_mem_read_r)
         $fwrite(file, "%12t | stat_mem_read: %x\n", $time, stat_mem_info_cast_o);
 
-      if (data_v_o)
-        $fwrite(file, "%12t | fetch: [%x]->%x\n", $time, paddr_tv_r, data_o);
-      if (miss_v_o)
+      if (data_v_o1)
+        $fwrite(file, "%12t | fetch: [%x]->%x\n", $time, paddr_tv_r, data_o1);
+      if (miss_v_o1)
         $fwrite(file, "%12t | spec miss: [%x]\n", $time, paddr_tv_r);
 
       if (cache_req_yumi_i)

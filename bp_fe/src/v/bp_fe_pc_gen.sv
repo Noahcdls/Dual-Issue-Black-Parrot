@@ -33,7 +33,7 @@ module bp_fe_pc_gen
    , input                                           redirect_br_nonbr_i
 
 //output new pc values if yumi
-   , output logic [vaddr_width_p-1:0]                next_pc_o1, next_pc_o2,
+   , output logic [vaddr_width_p-1:0]                next_pc_o1, next_pc_o2
    , input                                           next_pc_yumi_i
 
    , output logic                                    ovr_o
@@ -165,12 +165,15 @@ module bp_fe_pc_gen
   wire is_call1 = fetch_instr_v_i1 & scan_instr1.call;
   wire is_ret1  = fetch_instr_v_i1 & scan_instr1.ret;
 
+  wire is_br_op1 = is_br1 |  is_jal1 | is_jalr1 | is_call1 | is_ret1;
+
   wire is_br2   = fetch_instr_v_i2 & scan_instr2.branch;
   wire is_jal2  = fetch_instr_v_i2 & scan_instr2.jal;
   wire is_jalr2 = fetch_instr_v_i2 & scan_instr2.jalr;
   wire is_call2 = fetch_instr_v_i2 & scan_instr2.call;
   wire is_ret2  = fetch_instr_v_i2 & scan_instr2.ret;
-
+ 
+ wire is_br_op2 = is_br2 |  is_jal2 | is_jalr2 | is_call2 | is_ret2;
 
   // BTB
   //it's valid to read your btb if an instruction is being consumed (yumi :P)
@@ -267,11 +270,10 @@ module bp_fe_pc_gen
      ,.w_yumi_o(bht_w_yumi_lo)
      );
   assign btb_taken = btb_br_tgt_v_lo & (bht_pred_lo | btb_br_tgt_jmp_lo);
-  logic 
   // RAS
 
   //fix here to support calls
-  logic is_call = is_call1 | is_call2;
+  wire is_call = is_call1 | is_call2;
   //return address chosen depending if first one is return address, otherwise second pc check
   logic [vaddr_width_p-1:0] return_addr_n1, return_addr_r2;
   bsg_dff_reset_en
@@ -319,7 +321,7 @@ module bp_fe_pc_gen
       end
     else
       begin
-        pred_if2_n = pred_if1_r1;
+        pred_if2_n1 = pred_if1_r1;
       end
 
   always_comb
@@ -343,20 +345,25 @@ logic passed_call1, passed_call2, pass_jump_path;
   #(.width_p(1))
     pass_call1
     (.clk_i(clk_i)
-    ,.data_i(is_call1),
-    ,.data_o(passed_call1));
+    ,.data_i(is_call1)
+    ,.data_o(passed_call1)
+    );
+
   bsg_dff
   #(.width_p(1))
     pass_call2
     (.clk_i(clk_i)
-    ,.data_i(is_call2),
-    ,.data_o(passed_call2));
+    ,.data_i(is_call2)
+    ,.data_o(passed_call2)
+    );
+
   bsg_dff
   #(.width_p(1))
     pass_path
     (.clk_i(clk_i)
-    ,.data_i(jump_path),
-    ,.data_o(pass_jump_path));
+    ,.data_i(jump_path)
+    ,.data_o(pass_jump_path)
+    );
 
 
   bsg_dff
@@ -396,20 +403,20 @@ logic passed_call1, passed_call2, pass_jump_path;
   bp_fe_branch_metadata_fwd_s br_metadata_site;
   assign fetch_br_metadata_fwd_o = br_metadata_site;
   always_ff @(posedge clk_i)
-    if (fetch_instr_v_i)
+    if (fetch_instr_v_i1)
       br_metadata_site <=
-        '{src_btb  : pred_if2_r1.btb
-          ,src_ret : pred_if2_r1.ret
-          ,ghist   : pred_if2_r1.ghist
-          ,bht_row : pred_if2_r1.bht_row
+        '{src_btb  : is_br_op1 ? pred_if2_r1.btb : is_br_op2 ? pred_if2_r2.btb : pred_if2_r1.btb
+          ,src_ret : is_br_op1 ? pred_if2_r1.ret : is_br_op2 ? pred_if2_r2.ret : pred_if2_r1.ret
+          ,ghist   : is_br_op1 ? pred_if2_r1.ghist : is_br_op2 ? pred_if2_r2.ghist : pred_if2_r1.ghist
+          ,bht_row : is_br_op1 ? pred_if2_r1.bht_row : is_br_op2 ? pred_if2_r2.bht_row : pred_if2_r1.bht_row
           ,btb_tag : (pass_jump_path ? pc_if2_r1[2+btb_idx_width_p+:btb_tag_width_p] : pc_if2_r2[2+btb_idx_width_p+:btb_tag_width_p])
           ,btb_idx : (pass_jump_path ? pc_if2_r1[2+:btb_idx_width_p] : pc_if2_r2[2+:btb_idx_width_p])
           ,bht_idx : (pass_jump_path ? pc_if2_r1[2+:bht_idx_width_p] : pc_if2_r2[2+:bht_idx_width_p])
-          ,is_br   : is_br1 | is_br2
-          ,is_jal  : is_jal1 | is_jal2
-          ,is_jalr : is_jalr1 | is_jalr2
-          ,is_call : is_call1 | is_call2
-          ,is_ret  : is_ret1 | is_ret2
+          ,is_br   : is_br_op1 ? is_br1 : is_br_op2 ? is_br2 : is_br1
+          ,is_jal  : is_br_op1 ? is_jal1 : is_br_op2 ? is_jal2 : is_jal1
+          ,is_jalr : is_br_op1 ? is_jalr1 : is_br_op2 ? is_jalr2 : is_jalr1
+          ,is_call : is_br_op1 ? is_call1 : is_br_op2 ? is_call2 : is_call1
+          ,is_ret  : is_br_op1 ? is_ret1 : is_br_op2 ? is_ret2 : is_ret1
           };
 
   // Scan fetched instruction
@@ -431,10 +438,10 @@ logic passed_call1, passed_call2, pass_jump_path;
 
   // Global history
   //
-  wire ghistory_w_v_li = is_br | redirect_br_v_i;
+  wire ghistory_w_v_li = is_br1 | is_br2 | redirect_br_v_i;
   assign ghistory_n = redirect_br_v_i
     ? redirect_br_metadata_fwd.ghist
-    : {ghistory_r[0+:ghist_width_p-1], pred_if2_r.taken};
+    : {ghistory_r[0+:ghist_width_p-1], pred_if2_r1.taken};
   bsg_dff_reset_en
    #(.width_p(ghist_width_p))
    ghist_reg

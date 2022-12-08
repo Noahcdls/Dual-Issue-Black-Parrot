@@ -1,0 +1,3 @@
+g++    bp_monitor.o dromajo_cosim.o bsg_mem_dma.o bsg_nonsynth_dpi_clock_gen.o test_bp.o verilated.o verilated_dpi.o verilated_fst_c.o verilated_threads.o Vtestbench__ALL.a   -lz -lpthread -L/home/nsantos/Desktop/black-parrot-sim/rtl/../tools/install/lib -ldramsim3 -Wl,-rpath=/home/nsantos/Desktop/black-parrot-sim/rtl/install/lib -L/home/nsantos/Desktop/black-parrot-sim/rtl/install/lib -ldromajo_cosim -Wl,-rpath=/home/nsantos/Desktop/black-parrot-sim/rtl/install/lib  -pthread -lpthread   -o simsc
+rm Vtestbench__ALL.verilator_deplist.tmp
+make[1]: Leaving directory '/home/nsantos/Desktop/black-parrot-sim/rtl/bp_top/syn/results/verilator/bp_tethered.e_bp_default_cfg.none.build/obj_dir'

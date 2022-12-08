@@ -1,5 +1,14 @@
 /*
  * bp_fe_top.v
+  Modifications:
+  1. Duplicated and/or edited logic for branch checking between two active instructions
+  2. Cache reworked for two instr
+  3. Edits for testing two instr using two different pipes
+
+  icache still needs a lot of work to be compatible with system state so it can make cache requests
+  as of now it fails to makes updates due to hitting exceptions sooner on dual issue compared to single
+  leading to system stall affecting cache request access - Noah
+
  */
 
 `include "bp_common_defines.svh"
@@ -30,17 +39,11 @@ module bp_fe_top
 //output to queue between front and back
 //ready so it can feed a new instr
 //update two 2 queue streams
-  //  , output [fe_queue_width_lp-1:0]                   fe_queue_o
-  //  , output                                           fe_queue_v_o
-  //  , input                                            fe_queue_ready_i
    , output [fe_queue_width_lp-1:0]                   fe_queue_o1, fe_queue_o2
    , output                                           fe_queue_v_o1, fe_queue_v_o2
    , input                                            fe_queue_ready_i1, fe_queue_ready_i2
 
 //cache requests
-//doubled
-  //  , output logic [icache_req_width_lp-1:0]           cache_req_o
-  //  , output logic                                     cache_req_v_o
    , output logic [icache_req_width_lp-1:0]           cache_req_o
    , output logic                                     cache_req_v_o
 
@@ -158,7 +161,7 @@ module bp_fe_top
      ,.redirect_br_nonbr_i(redirect_br_nonbr_li)
 
      ,.next_pc_o1(next_pc_lo1) //next pc data provided by pc_gen
-     ..next_pc_o2(next_pc_lo2)
+     ,.next_pc_o2(next_pc_lo2)
      ,.next_pc_yumi_i(next_pc_yumi_li) //input on whether the next instr can run
 
      ,.ovr_o(ovr_lo)//output if BTB misses but still need to branch
@@ -440,7 +443,7 @@ module bp_fe_top
                         ,op  : icache_fence_v ? e_icache_fencei : icache_fill_response_v ? e_icache_fill : e_icache_fetch
                         };
     assign icache_pkt2 = '{vaddr: next_pc_lo2
-                        ,op  : e_icache_fetch //icache_fence_v ? e_icache_fencei : icache_fill_response_v ? e_icache_fill : 
+                        ,op  : icache_fence_v ? e_icache_fencei : icache_fill_response_v ? e_icache_fill : e_icache_fetch
                         };
   // TODO: Should only ack icache fence when icache_ready
 
@@ -457,9 +460,9 @@ module bp_fe_top
   logic icache_poison_tl, icache_poison_tl2;
 
   //icache
-bp_fe_icache_di_v2
+bp_fe_icache
    #(.bp_params_p(bp_params_p))
-   icache1
+   icache
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -467,7 +470,7 @@ bp_fe_icache_di_v2
 
      ,.icache_pkt1_i(icache_pkt1)
      ,.icache_pkt2_i(icache_pkt2)
-     ,.v_i(icache_v_li)
+     ,.v_i1(icache_v_li)
      ,.v_i2(icache_v_li)     
      ,.ready_o(icache_ready_lo)
 
@@ -484,7 +487,6 @@ bp_fe_icache_di_v2
      ,.data_v_o1(icache_data_v_lo)
      ,.miss_v_o1(icache_miss_v_lo)
 
-     ,.icache_pkt_i2(icache_pkt2)
      ,.ptag_i2(ptag_li2)
      ,.ptag_v_i2(ptag_v_li2)
      ,.ptag_uncached_i2(ptag_uncached_li2)
@@ -531,7 +533,7 @@ bp_fe_icache_di_v2
 //pass instr errors
   bsg_dff_reset
    #(.width_p(4))
-   fault_reg
+   fault_reg1
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -541,7 +543,7 @@ bp_fe_icache_di_v2
 
   bsg_dff_reset
    #(.width_p(4))
-   fault_reg
+   fault_reg2
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
 
@@ -584,16 +586,23 @@ bp_fe_icache_di_v2
   wire queue_miss     = v_if2_r & ~fe_queue_ready_i1;
   wire queue_miss2     = v_if2_r2 & ~fe_queue_ready_i2;  
 //valid fetch2 and instr error leading to exception
-  wire fe_exception_v = v_if2_r & (instr_misaligned_r | instr_access_fault_r | instr_page_fault_r | itlb_miss_r | icache_miss_v_lo);
-  wire fe_exception_v2 = v_if2_r2 & (instr_misaligned_r2 | instr_access_fault_r2 | instr_page_fault_r2 | itlb_miss_r2 | icache_miss_v_lo2);
+  // wire fe_exception_v = v_if2_r & (instr_misaligned_r | instr_access_fault_r | instr_page_fault_r | itlb_miss_r | icache_miss_v_lo);
+  // wire fe_exception_v2 = v_if2_r2 & (instr_misaligned_r2 | instr_access_fault_r2 | instr_page_fault_r2 | itlb_miss_r2 | icache_miss_v_lo2);
+
+  wire fe_exception_v = 0;
+  wire fe_exception_v2 = 0;
 
 //valid front end instr if valid fetch2 and valid data out
 //only send out valid instructions if they are both valid
   wire fe_instr_v     = v_if2_r & icache_data_v_lo & icache_data_v_lo2;
   wire fe_instr_v2    = v_if2_r2 & icache_data_v_lo2 & icache_data_v_lo;
   //front end queue out (can feed queue) which comes from a ready queue,valid or exception instr, and attaboy (can keep going)
-  assign fe_queue_v_o1 = fe_queue_ready_i1 & (fe_instr_v | fe_exception_v) & ~cmd_nonattaboy_v;
-  assign fe_queue_v_o2 = fe_queue_ready_i2 & (fe_instr_v2 | fe_exception_v2) & ~cmd_nonattaboy_v;
+  //set to 1 for basic testing of sending instr out
+  // assign fe_queue_v_o1 = fe_queue_ready_i1 & (fe_instr_v | fe_exception_v) & ~cmd_nonattaboy_v;
+  // assign fe_queue_v_o2 = fe_queue_ready_i2 & (fe_instr_v2 | fe_exception_v2) & ~cmd_nonattaboy_v;
+
+  assign fe_queue_v_o1 = 1;//fe_queue_ready_i1 & (fe_instr_v | fe_exception_v) & ~cmd_nonattaboy_v;
+  assign fe_queue_v_o2 = 1;//fe_queue_ready_i2 & (fe_instr_v2 | fe_exception_v2) & ~cmd_nonattaboy_v;
 
 //cache is poisoned if missed redirect or exception or queue miss or not attaboy
   assign icache_poison_tl = ovr_lo | fe_exception_v | queue_miss | cmd_nonattaboy_v;
@@ -617,6 +626,7 @@ bp_fe_icache_di_v2
   assign fetch_li2 = icache_data_lo2;
 
 //decode instr so we can NO-OP if needed
+`declare_bp_fe_instr_scan_s(vaddr_width_p);
 bp_fe_instr_scan_s fetch1_decoded, fetch2_decoded;
 bp_fe_instr_scan
   #(.bp_params_p(bp_params_p))
@@ -633,19 +643,22 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
 //stall and unstall conditions
 //stall if failed fetch or have to fix redirect
   wire stall   = fetch_fail_v_li | fetch_fail_v_li2 | cmd_nonattaboy_v;
+
+  //for test purposes never stall
+  // wire stall = 0;
 //can end stall if cache is ready with data, the queue is ready, and non miss behavior
-  wire unstall = icache_ready_lo & icache_ready_lo2 & fe_queue_ready_i1 & fe_queue_ready_i2 & ~cmd_nonattaboy_v;
+  wire unstall = icache_ready_lo & fe_queue_ready_i1 & fe_queue_ready_i2 & ~cmd_nonattaboy_v;
 
   //on exception, update queue cast to give info, else give good cast data
   always_comb
     //double check on how to figure if we share metadata for exceptions or not
-    if (fe_exception_v || fe_exception_v2)
+    if ((fe_exception_v || fe_exception_v2))
       begin
         fe_queue_cast_o1 = '0;
         fe_queue_cast_o2 = '0;
         if(fe_exception_v) 
         begin
-          // fe_queue_cast_o1 = '0;
+          fe_queue_cast_o1 = '0;
           fe_queue_cast_o1.msg_type                     = e_fe_exception;
           fe_queue_cast_o1.msg.exception.vaddr          = fetch_pc_lo1;
           fe_queue_cast_o1.msg.exception.exception_code = itlb_miss_r
@@ -659,7 +672,7 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
                                                                    : e_icache_miss;
         end
         if(fe_exception_v2) begin
-          // fe_queue_cast_o2 = '0;
+          fe_queue_cast_o2 = '0;
           fe_queue_cast_o2.msg_type                     = e_fe_exception;
           fe_queue_cast_o2.msg.exception.vaddr          = fetch_pc_lo2;
           fe_queue_cast_o2.msg.exception.exception_code = itlb_miss_r2
@@ -681,7 +694,9 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
         //PC value of instr
         fe_queue_cast_o1.msg.fetch.pc                  = fetch_pc_lo1;
         //the instr itself from icache
-        fe_queue_cast_o1.msg.fetch.instr               = fetch_li1;
+        //this is a test instr for addi
+        fe_queue_cast_o1.msg.fetch.instr               = 32'h03230393;//ADDI t2, t1, 0x32
+        // fe_queue_cast_o1.msg.fetch.instr               = fetch_li1;
         //passes a metadata packet
         fe_queue_cast_o1.msg.fetch.branch_metadata_fwd = fetch_br_metadata_fwd_lo;
         
@@ -691,29 +706,40 @@ wire is_branch = fetch1_decoded.branch | fetch1_decoded.jal | fetch1_decoded.jal
         //PC value of instr
         fe_queue_cast_o2.msg.fetch.pc                  =  fetch_pc_lo2;
         //the instr itself from icache
-        fe_queue_cast_o2.msg.fetch.instr               = fetch_li2;
+        //this is a test instr for multiplication
+        // fe_queue_cast_o2.msg.fetch.instr               = 32'h02e687b3;//MUL a5, a3, a4
+        // fe_queue_cast_o2.msg.fetch.instr               = 32'h027687b3;//MUL a5, t2, a4
+        fe_queue_cast_o2.msg.fetch.instr               = 32'h04030393;//ADDI t2, t1, 0x40
+        // fe_queue_cast_o2.msg.fetch.instr               = fetch_li2;
         fe_queue_cast_o2.msg.fetch.branch_metadata_fwd = fetch_br_metadata_fwd_lo;
       end
 
   // Controlling state machine
+  //Set to always run for basic testing of be
   always_comb
     case (state_r)
       // Wait for FE cmd
-      e_wait : state_n = cmd_immediate_v ? e_run : cmd_nonattaboy_v ? e_stall : e_wait;
+      // e_wait : state_n = cmd_immediate_v ? e_run : cmd_nonattaboy_v ? e_stall : e_wait;
+      e_wait : state_n = e_run;
       // Stall until we can start valid fetch
-      e_stall: state_n = unstall ? e_run : e_stall;
+      // e_stall: state_n = unstall ? e_run : e_stall;
+      e_stall : state_n =  e_run;
       // Run state -- PCs are actually being fetched
       // Stay in run if there's an incoming cmd, the next pc will automatically be valid
       // Transition to wait if there's a TLB miss while we wait for fill
       // Transition to stall if we don't successfully complete the fetch for whatever reason
-      e_run  : state_n = cmd_immediate_v
-                         ? e_run
-                         : (stall || cmd_complex_v)
-                           ? e_stall
-                           : (fetch_exception_v_li1 || fetch_exception_v_li2)
-                             ? e_wait
-                             : e_run;
-      default: state_n = e_wait;
+
+
+      e_run: state_n = e_run;
+      // e_run  : state_n = cmd_immediate_v
+      //                    ? e_run
+      //                    : (stall || cmd_complex_v)
+      //                      ? e_stall
+      //                      : (fetch_exception_v_li1 || fetch_exception_v_li2)
+      //                        ? e_wait
+      //                        : e_run;
+      default state_n = e_run;
+      // default: state_n = e_wait;
     endcase
 
   // synopsys sync_set_reset "reset_i"

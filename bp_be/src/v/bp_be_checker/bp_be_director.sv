@@ -268,7 +268,7 @@ module bp_be_director
       fe_cmd_v_li2 = 1'b0;
       fe_cmd_pc_redirect_operands2 = '0;
 
-      if (commit_pkt2_cast_i.unfreeze)
+      if (commit_pkt2_cast_i.unfreeze && !commit_pkt_cast_i.unfreeze)
         begin
           fe_cmd_li2.opcode = e_op_state_reset;
           fe_cmd_li2.vaddr  = npc_r;
@@ -279,7 +279,7 @@ module bp_be_director
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.itlb_fill_v)
+      else if (commit_pkt2_cast_i.itlb_fill_v && !commit_pkt_cast_i.itlb_fill_v)
         begin
           fe_cmd_li2.opcode                               = e_op_itlb_fill_response;
           fe_cmd_li2.vaddr                                = commit_pkt2_cast_i.npc;
@@ -287,14 +287,14 @@ module bp_be_director
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.sfence)
+      else if (commit_pkt2_cast_i.sfence && !commit_pkt_cast_i.sfence)
         begin
           fe_cmd_li2.opcode = e_op_itlb_fence;
           fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.csrw)
+      else if (commit_pkt2_cast_i.csrw && !commit_pkt_cast_i.csrw)
         begin
           fe_cmd_li2.opcode                            = e_op_pc_redirection;
           fe_cmd_li2.vaddr                             = commit_pkt2_cast_i.npc;
@@ -304,28 +304,28 @@ module bp_be_director
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.wfi)
+      else if (commit_pkt2_cast_i.wfi && !commit_pkt_cast_i.wfi)
         begin
           fe_cmd_li2.opcode = e_op_wait;
           fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.fencei)
+      else if (commit_pkt2_cast_i.fencei && !commit_pkt_cast_i.fencei)
         begin
           fe_cmd_li2.opcode = e_op_icache_fence;
           fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.icache_miss)
+      else if (commit_pkt2_cast_i.icache_miss && !commit_pkt_cast_i.icache_miss)
         begin
           fe_cmd_li2.opcode = e_op_icache_fill_response;
           fe_cmd_li2.vaddr  = commit_pkt2_cast_i.npc;
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (commit_pkt2_cast_i.eret)
+      else if (commit_pkt2_cast_i.eret && !commit_pkt2_cast_i.eret)
         begin
           fe_cmd_li2.opcode                                 = e_op_pc_redirection;
           fe_cmd_li2.vaddr                                  = commit_pkt2_cast_i.npc;
@@ -347,7 +347,7 @@ module bp_be_director
 
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
-      else if (isd_status1_cast_i.v & npc_mismatch_v)
+      else if (!isd_status1_cast_i.v & isd_status2_cast_i.v & npc_mismatch_v)
         begin
           fe_cmd_li2.opcode                                 = e_op_pc_redirection;
           fe_cmd_li2.vaddr                                  = expected_npc_o;
@@ -363,7 +363,7 @@ module bp_be_director
           fe_cmd_v_li2 = fe_cmd_ready_lo2;
         end
       // Send an attaboy if there's a correct prediction
-      else if (isd_status1_cast_i.v & ~npc_mismatch_v & last_instr_was_branch)
+      else if (!isd_status1_cast_i.v & isd_status2_cast_i.v & ~npc_mismatch_v & last_instr_was_branch)
         begin
           fe_cmd_li2.opcode                               = e_op_attaboy;
           fe_cmd_li2.vaddr                                = expected_npc_o;

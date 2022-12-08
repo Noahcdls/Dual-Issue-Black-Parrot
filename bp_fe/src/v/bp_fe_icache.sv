@@ -24,6 +24,16 @@
  *    Uses fill_index in data_mem_pkt to generate a write_mask for the data banks
  *      bank_width = block_width / assoc >= dword_width
  *      fill_width = N*bank_width <= block_width
+
+
+  Modification notes
+  This implementation doesn't make requests for the second instr
+  this was done to simplify the structure for a basic model for testing
+  Minimal logic is duplicated to perform this and data memory is widened
+  to support the two instructions. Ideally we would like to request for two instr
+  but icache needs to work with the system first as the front end state machine
+  is preventing cache requests on boot to uce. For what was intended for dual
+  instr request icache, look to the dual_issue model - Noah
  */
 
 `include "bp_common_defines.svh"
@@ -46,32 +56,34 @@ module bp_fe_icache
    , localparam cfg_bus_width_lp    = `bp_cfg_bus_width(vaddr_width_p, hio_width_p, core_id_width_p, cce_id_width_p, lce_id_width_p)
    , localparam icache_pkt_width_lp = `bp_fe_icache_pkt_width(vaddr_width_p)
    )
-  (input                                              clk_i
-   , input                                            reset_i
+  ( input       clk_i
+    , input                                            reset_i
 
    // Unused except for tracers
    , input [cfg_bus_width_lp-1:0]                     cfg_bus_i
 
    // Cycle 0: "Decode"
    // New I$ packet comes in for a fetch, fence or fill request.
-   , input [icache_pkt_width_lp-1:0]                  icache_pkt_i
-   , input                                            v_i
+   , input [icache_pkt_width_lp-1:0]                  icache_pkt1_i, icache_pkt2_i
+   //valid bit? and data ready maybe
+   , input                                            v_i1,v_i2
    , output                                           ready_o
 
    // Cycle 1: "Tag Lookup"
    // TLB and PMA information comes in this cycle
-   , input [ptag_width_p-1:0]                         ptag_i
-   , input                                            ptag_v_i
-   , input                                            ptag_uncached_i
-   , input                                            ptag_nonidem_i
-   , input                                            ptag_dram_i
-   , input                                            poison_tl_i
+   , input [ptag_width_p-1:0]                         ptag_i1, ptag_i2
+   , input                                            ptag_v_i1, ptag_v_i2
+   , input                                            ptag_uncached_i1, ptag_uncached_i2
+   , input                                            ptag_nonidem_i1, ptag_nonidem_i2
+   , input                                            ptag_dram_i1, ptag_dram_i2
+   //dont know if I need to add another poison. Adding one anyways
+   , input                                            poison_tl_i1, poison_tl_i2
 
    // Cycle 2: "Tag Verify"
    // Data (or miss result) comes out of the cache
-   , output logic [instr_width_gp-1:0]                data_o
-   , output logic                                     data_v_o
-   , output logic                                     miss_v_o
+   , output logic [instr_width_gp-1:0]                data_o1, data_o2
+   , output logic                                     data_v_o1, data_v_o2
+   , output logic                                     miss_v_o1, miss_v_o2
 
    // Cache Engine Interface
    // This is considered the "slow path", handling uncached requests
@@ -122,6 +134,8 @@ module bp_fe_icache
     : byte_offset_width_lp;
   localparam block_size_in_fill_lp  = block_width_p / fill_width_p;
   localparam fill_size_in_bank_lp   = fill_width_p / bank_width_lp;
+  assign data_v_o2 = data_v_o1;
+  assign miss_v_o2 = miss_v_o1;
 
   // State machine declaration
   enum logic [1:0] {e_ready, e_miss} state_n, state_r;
@@ -140,13 +154,17 @@ module bp_fe_icache
   // Decode stage
   /////////////////////////////////////////////////////////////////////////////
   `declare_bp_fe_icache_pkt_s(vaddr_width_p);
-  `bp_cast_i(bp_fe_icache_pkt_s, icache_pkt);
+  `bp_cast_i(bp_fe_icache_pkt_s, icache_pkt1);
+  `bp_cast_i(bp_fe_icache_pkt_s, icache_pkt2);
+  wire [vaddr_width_p-1:0]   vaddr2 = icache_pkt2_cast_i.vaddr;
+  wire [vtag_width_p-1:0]    vaddr2_vtag  = vaddr2[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
+  wire [sindex_width_lp-1:0] vaddr2_index = vaddr2[block_offset_width_lp+:sindex_width_lp];
+  wire [bindex_width_lp-1:0] vaddr2_bank  = vaddr2[byte_offset_width_lp+:bindex_width_lp];
+  wire is_fetch  = (icache_pkt1_cast_i.op inside {e_icache_fetch, e_icache_fill});
+  wire is_fencei = (icache_pkt1_cast_i.op inside {e_icache_fencei});
+  wire is_fill   = (icache_pkt1_cast_i.op inside {e_icache_fill});
 
-  wire is_fetch  = (icache_pkt_cast_i.op inside {e_icache_fetch, e_icache_fill});
-  wire is_fencei = (icache_pkt_cast_i.op inside {e_icache_fencei});
-  wire is_fill   = (icache_pkt_cast_i.op inside {e_icache_fill});
-
-  wire [vaddr_width_p-1:0]   vaddr       = icache_pkt_cast_i.vaddr;
+  wire [vaddr_width_p-1:0]   vaddr       = icache_pkt1_cast_i.vaddr;
   wire [vtag_width_p-1:0]    vaddr_vtag  = vaddr[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
   wire [sindex_width_lp-1:0] vaddr_index = vaddr[block_offset_width_lp+:sindex_width_lp];
   wire [bindex_width_lp-1:0] vaddr_bank  = vaddr[byte_offset_width_lp+:bindex_width_lp];
@@ -183,20 +201,27 @@ module bp_fe_icache
   logic [assoc_p-1:0]                             data_mem_v_li;
   logic [assoc_p-1:0]                             data_mem_w_li;
   logic [assoc_p-1:0][data_mem_addr_width_lp-1:0] data_mem_addr_li;
+  logic [assoc_p-1:0][data_mem_addr_width_lp-1:0] data_mem_addr_li2;
   logic [assoc_p-1:0][bank_width_lp-1:0]          data_mem_data_li;
   logic [assoc_p-1:0][bank_width_lp-1:0]          data_mem_data_lo;
-
+  logic [assoc_p-1:0][bank_width_lp-1:0]          data_mem_data_lo2;
   for (genvar bank = 0; bank < assoc_p; bank++)
     begin: data_mems
-      bsg_mem_1rw_sync #(.width_p(bank_width_lp), .els_p(sets_p*assoc_p), .latch_last_read_p(1))
+      bsg_mem_2rw_sync #(.width_p(bank_width_lp), .els_p(sets_p*assoc_p))
        data_mem
         (.clk_i(clk_i)
          ,.reset_i(reset_i)
-         ,.data_i(data_mem_data_li[bank])
-         ,.addr_i(data_mem_addr_li[bank])
-         ,.v_i(data_mem_v_li[bank])
-         ,.w_i(data_mem_w_li[bank])
-         ,.data_o(data_mem_data_lo[bank])
+         ,.a_data_i(data_mem_data_li[bank])
+         ,.a_addr_i(data_mem_addr_li[bank])
+         ,.a_v_i(data_mem_v_li[bank])
+         ,.a_w_i(data_mem_w_li[bank])
+         ,.a_data_o(data_mem_data_lo[bank])
+
+         ,.b_data_i(0)
+         ,.b_addr_i(data_mem_addr_li2[bank])
+         ,.b_v_i(data_mem_v_li[bank] & ~data_mem_w_li[bank])
+         ,.b_w_i(0)
+         ,.b_data_o(data_mem_data_lo2[bank])         
          );
     end
 
@@ -207,7 +232,7 @@ module bp_fe_icache
   logic fill_op_tl_r, fetch_op_tl_r, fencei_op_tl_r;
 
   // Valid when we accept new data, clear when we advance to tv
-  assign tl_we = ready_o & v_i;
+  assign tl_we = ready_o & v_i1;
   bsg_dff_reset_set_clear
    #(.width_p(1))
    v_tl_reg
@@ -231,7 +256,7 @@ module bp_fe_icache
      ,.data_o({vaddr_tl_r, fill_op_tl_r, fetch_op_tl_r, fencei_op_tl_r})
      );
 
-  wire [paddr_width_p-1:0]         paddr_tl = {ptag_i, vaddr_tl_r[0+:page_offset_width_gp]};
+  wire [paddr_width_p-1:0]         paddr_tl = {ptag_i1, vaddr_tl_r[0+:page_offset_width_gp]};
   wire [vtag_width_p-1:0]     vaddr_vtag_tl = vaddr_tl_r[block_offset_width_lp+sindex_width_lp+:vtag_width_p];
   wire [sindex_width_lp-1:0] vaddr_index_tl = vaddr_tl_r[block_offset_width_lp+:sindex_width_lp];
   wire [bindex_width_lp-1:0]  vaddr_bank_tl = vaddr_tl_r[byte_offset_width_lp+:bindex_width_lp];
@@ -239,13 +264,13 @@ module bp_fe_icache
   logic [assoc_p-1:0] way_v_tl, hit_v_tl;
   for (genvar i = 0; i < assoc_p; i++) begin: tag_comp_tl
     assign way_v_tl[i] = (tag_mem_data_lo[i].state != e_COH_I);
-    assign hit_v_tl[i] = (tag_mem_data_lo[i].tag == ptag_i) && way_v_tl[i];
+    assign hit_v_tl[i] = (tag_mem_data_lo[i].tag == ptag_i1) && way_v_tl[i];
   end
   wire cached_hit_tl     = |hit_v_tl;
-  wire fetch_uncached_tl = (fetch_op_tl_r &  ptag_uncached_i);
-  wire fetch_cached_tl   = (fetch_op_tl_r & ~ptag_uncached_i);
-  wire fill_tl           = (fill_op_tl_r | ~ptag_nonidem_i);
-  wire dram_tl           = (fill_op_tl_r | fetch_op_tl_r) & ptag_dram_i;
+  wire fetch_uncached_tl = (fetch_op_tl_r &  ptag_uncached_i1);
+  wire fetch_cached_tl   = (fetch_op_tl_r & ~ptag_uncached_i1);
+  wire fill_tl           = (fill_op_tl_r | ~ptag_nonidem_i1);
+  wire dram_tl           = (fill_op_tl_r | fetch_op_tl_r) & ptag_dram_i1;
 
   logic [assoc_p-1:0] bank_sel_one_hot_tl;
   bsg_decode
@@ -263,10 +288,10 @@ module bp_fe_icache
   logic [assoc_p-1:0]                    way_v_tv_r, hit_v_tv_r;
   logic                                  cached_hit_tv_r;
   logic                                  fill_tv_r, dram_tv_r, fencei_op_tv_r, uncached_op_tv_r, cached_op_tv_r;
-  logic [assoc_p-1:0][bank_width_lp-1:0] ld_data_tv_r;
+  logic [assoc_p-1:0][bank_width_lp-1:0] ld_data_tv_r, ld_data_tv_r2;
 
   // fence.i does not check tags
-  assign tv_we = v_tl_r & (ptag_v_i | fencei_op_tl_r);
+  assign tv_we = v_tl_r & (ptag_v_i1 | fencei_op_tl_r);
   bsg_dff_reset_set_clear
    #(.width_p(1))
    v_tv_reg
@@ -280,20 +305,34 @@ module bp_fe_icache
 
   logic [block_width_p-1:0] ld_data_tv_n;
   assign ld_data_tv_n = data_mem_data_lo;
-  bsg_dff_en
+  logic [block_width_p-1:0] ld_data_tv_n2;
+  assign ld_data_tv_n2 = data_mem_data_lo2;
+  bsg_dff_reset_en
    #(.width_p(block_width_p))
    ld_data_tv_reg
     (.clk_i(clk_i)
      ,.en_i(tv_we)
+     ,.reset_i(0)
      ,.data_i(ld_data_tv_n)
      ,.data_o(ld_data_tv_r)
      );
 
-  bsg_dff_en
+  bsg_dff_reset_en
+   #(.width_p(block_width_p))
+   ld_data_tv_reg2
+    (.clk_i(clk_i)
+     ,.en_i(tv_we)
+     ,.reset_i(0)
+     ,.data_i(ld_data_tv_n2)
+     ,.data_o(ld_data_tv_r2)
+     );
+
+  bsg_dff_reset_en
    #(.width_p(paddr_width_p+3*assoc_p+6))
    tv_stage_reg
     (.clk_i(clk_i)
      ,.en_i(tv_we)
+     ,.reset_i(0)
      ,.data_i({paddr_tl
                ,bank_sel_one_hot_tl, way_v_tl, hit_v_tl, cached_hit_tl
                ,fill_tl, dram_tl, fencei_op_tl_r, fetch_uncached_tl, fetch_cached_tl
@@ -346,6 +385,16 @@ module bp_fe_icache
      ,.data_o(ld_data_way_picked)
      );
 
+
+  logic [bank_width_lp-1:0] ld_data_way_picked2;
+  bsg_mux_one_hot
+   #(.width_p(bank_width_lp), .els_p(assoc_p))
+   data_set_select_mux2
+    (.data_i(ld_data_tv_r2)
+     ,.sel_one_hot_i(ld_data_way_select)
+     ,.data_o(ld_data_way_picked2)
+     );
+
   logic [instr_width_gp-1:0] final_data;
   bsg_mux
    #(.width_p(instr_width_gp), .els_p(num_words_per_bank_lp))
@@ -355,11 +404,21 @@ module bp_fe_icache
      ,.data_o(final_data)
      );
 
-  assign data_o = uncached_op_tv_r ? uncached_data_r : final_data;
-  assign data_v_o = v_tv_r & ((uncached_op_tv_r & uncached_pending_r)
+  logic [instr_width_gp-1:0] final_data2;
+  bsg_mux
+   #(.width_p(instr_width_gp), .els_p(num_words_per_bank_lp))
+   dword_select_mux2
+    (.data_i(ld_data_way_picked2)
+     ,.sel_i(paddr_tv_r[2+:`BSG_SAFE_CLOG2(num_words_per_bank_lp)])
+     ,.data_o(final_data2)
+     );
+
+  assign data_o1 = uncached_op_tv_r ? uncached_data_r : final_data;
+  assign data_o2 = final_data2;
+  assign data_v_o1 = v_tv_r & ((uncached_op_tv_r & uncached_pending_r)
                               | (cached_op_tv_r & cached_hit_tv_r)
                               );
-  assign miss_v_o = v_tv_r & ~fill_tv_r & ~data_v_o;
+  assign miss_v_o1 = v_tv_r & ~fill_tv_r & ~data_v_o1;
 
   ///////////////////////////
   // Stat Mem Storage
@@ -597,6 +656,11 @@ module bp_fe_icache
       assign data_mem_addr_li[i] = data_mem_fast_read[i]
         ? {vaddr_index, {(assoc_p > 1){vaddr_bank}}}
         : {data_mem_pkt_cast_i.index, {(assoc_p > 1){data_mem_pkt_offset}}};
+      assign data_mem_addr_li[i] = data_mem_fast_read[i]
+        ? {vaddr_index, {(assoc_p > 1){vaddr_bank}}}
+        : {data_mem_pkt_cast_i.index, {(assoc_p > 1){data_mem_pkt_offset}}};
+
+      assign data_mem_addr_li2[i] = {vaddr2_index, {(assoc_p > 1){vaddr_bank}}};
       assign data_mem_data_li[i] = data_mem_pkt_data_li[i];
     end
   assign data_mem_pkt_yumi_o = (data_mem_pkt_cast_i.opcode == e_cache_data_mem_uncached)
@@ -624,8 +688,8 @@ module bp_fe_icache
   ///////////////////////////
   // Stat Mem Control
   ///////////////////////////
-  wire stat_mem_fast_read = (v_tv_r & ~data_v_o & cached_op_tv_r);
-  wire stat_mem_fast_write = (v_tv_r & data_v_o & cached_op_tv_r);
+  wire stat_mem_fast_read = (v_tv_r & ~data_v_o1 & cached_op_tv_r);
+  wire stat_mem_fast_write = (v_tv_r & data_v_o1 & cached_op_tv_r);
   wire stat_mem_slow_write = stat_mem_pkt_v_i & (stat_mem_pkt_cast_i.opcode != e_cache_stat_mem_read);
   assign stat_mem_pkt_yumi_o = stat_mem_pkt_v_i & ~stat_mem_fast_write & ~stat_mem_fast_read;
   assign stat_mem_v_li = stat_mem_fast_read | stat_mem_fast_write | stat_mem_pkt_yumi_o;
@@ -654,7 +718,7 @@ module bp_fe_icache
   //cache request accepted and running
   wire uncached_pending_set = cache_req_yumi_i & uncached_req;
   // Invalidate uncached data if the cache when we successfully complete the request
-  wire uncached_pending_clear = poison_tl_i | data_v_o;
+  wire uncached_pending_clear = poison_tl_i | data_v_o1;
   bsg_dff_reset_set_clear
    #(.width_p(1), .clear_over_set_p(1))
    uncached_pending_reg

@@ -1,0 +1,187 @@
+## bsg_mem_1r1w_sync: instantiating width_p=         50, els_p=         64, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.pc_gen.btb.tag_mem)
+## bsg_mem_1r1w_sync_synth: instantiating width_p=         50, els_p=         64 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.pc_gen.btb.tag_mem.synth)
+## bsg_mem_1r1w_sync: instantiating width_p=         8, els_p=        512, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.pc_gen.bht.bht_mem)
+## bsg_mem_1r1w_sync_synth: instantiating width_p=         8, els_p=        512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.pc_gen.bht.bht_mem.synth)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=       184, els_p=        64 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.tag_mem)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=         7, els_p=        64 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.stat_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[0].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[1].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[2].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[3].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[4].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[5].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[6].data_mem)
+## bsg_mem_2rw_sync: instantiating width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.fe.icache.data_mems[7].data_mem)
+## bsg_mem_multiport: instantiating width_p=         90, els_p=         4, read_write_same_addr_p=          0, write_write_same_addr_p=          0 harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.director.fe_cmd_fifo.fifo_mem,bsg_mem_multiport)
+## bsg_mem_multiport: instantiating width_p=       112, els_p=         8, read_write_same_addr_p=          0, write_write_same_addr_p=          0 harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.scheduler.fe_queue_fifo.queue_fifo_mem,bsg_mem_multiport)
+## bsg_mem_multiport: instantiating width_p=         24, els_p=         8, read_write_same_addr_p=          1, write_write_same_addr_p=          1 harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.scheduler.fe_queue_fifo.reg_fifo_mem,bsg_mem_multiport)
+## bsg_mem_multiport: instantiating width_p=         64, els_p=         32, read_write_same_addr_p=          0, write_write_same_addr_p=          0 harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.scheduler.int_regfile.tworonew.rf,bsg_mem_multiport)
+## bsg_mem_multiport: instantiating width_p=         68, els_p=         32, read_write_same_addr_p=          0, write_write_same_addr_p=          0 harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.scheduler.fp_regfile.threeronew.rf,bsg_mem_multiport)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=       184, els_p=        64 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.tag_mem)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=        15, els_p=        64 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.stat_mem)
+## bsg_mem_1r1w: instantiating width_p=       205, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.commit_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       135, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.cmd_xbar.buffer[0].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       135, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.cmd_xbar.buffer[1].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       135, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.cmd_xbar.buffer[2].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       134, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.resp_xbar.buffer[0].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       134, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.resp_xbar.buffer[1].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       134, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.resp_xbar.buffer[2].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       134, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.resp_xbar.buffer[3].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=       134, els_p=          2, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.resp_xbar.buffer[4].in_fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=        65, els_p=         8, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.cce_to_cache.cce_to_cache_pump_in.fifo.buffered.data_fifo.unhardened.un.fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=         6, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.cce_to_cache.stream_fifo.unhardened.un.fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=        512, els_p=          4, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.dram.dramsim3.cache_to_tram.rx0.data_afifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=        512, els_p=          4, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.dram.dramsim3.cache_to_tram.tx0.data_afifo.MSYNC_1r1w)
+########### BP Parameters ##############
+########### TOP IF ##############
+bp_cfg_bus_s          bits: struct          65 width         65
+########### FE-BE IF ##############
+bp_fe_queue_s          bits: struct         112 width        112
+bp_fe_cmd_s            bits: struct          90 width         90
+########### LCE-CCE IF ##############
+bp_bedrock_lce_req_header_s       bits: struct          63 width         63
+bp_bedrock_lce_cmd_header_s       bits: struct          75 width         75
+bp_bedrock_lce_resp_header_s      bits: struct          59 width         59
+########### CCE-MEM IF ##############
+bp_bedrock_mem_header_s           bits: struct          67 width         67
+BSG INFO: bsg_nonsynth_dpi_clock_gen (initial begin)
+BSG INFO:     Instantiation: testbench.testbench.clock_gen
+BSG INFO:     cycle_time_p  =                 1000
+BSG INFO: bsg_nonsynth_dpi_clock_gen (initial begin)
+BSG INFO:     Instantiation: testbench.testbench.dram_clock_gen
+BSG INFO:     cycle_time_p  =                 1250
+BSG INFO: bsg_nonsynth_dpi_clock_gen (initial begin)
+BSG INFO:     Instantiation: testbench.testbench.cosim_clk_gen
+BSG INFO:     cycle_time_p  =                  200
+BSG INFO: bsg_nonsynth_dpi_clock_gen (initial begin)
+BSG INFO:     Instantiation: testbench.testbench.rt_clk_gen
+BSG INFO:     cycle_time_p  =              1000000
+Command Trace write to ./dramsim3ch_0cmd.trace
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=       176, els_p=       128 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[0].cache.tag_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=       512, els_p=      1024 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[0].cache.data_mem)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=        15, els_p=       128 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[0].cache.stat_mem)
+## bsg_mem_1r1w: instantiating width_p=        64, els_p=         8, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[0].cache.dma.in_fifo.unhardened.un.fifo.mem_1r1w)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=       176, els_p=       128 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[1].cache.tag_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=       512, els_p=      1024 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[1].cache.data_mem)
+## bsg_mem_1rw_sync_mask_write_bit: instantiating width_p=        15, els_p=       128 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[1].cache.stat_mem)
+## bsg_mem_1r1w: instantiating width_p=        64, els_p=         8, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.l2s.bank[1].cache.dma.in_fifo.unhardened.un.fifo.mem_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[0].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[1].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[2].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[3].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[4].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[5].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[6].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[7].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[8].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[9].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[10].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[11].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[12].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[13].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[14].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[15].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[16].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[17].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[18].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[19].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[20].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[21].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[22].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[23].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[24].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[25].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[26].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[27].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[28].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[29].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[30].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         64, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.iwb[31].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[0].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[1].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[2].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[3].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[4].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[5].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[6].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[7].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[8].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[9].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[10].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[11].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[12].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[13].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[14].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[15].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[16].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[17].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[18].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[19].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[20].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[21].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[22].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[23].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[24].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[25].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[26].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[27].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[28].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[29].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[30].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1r1w: instantiating width_p=         68, els_p=       1024, read_write_same_addr_p=          0, harden_p=          0 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.cosim.fwb[31].ird_fifo.MSYNC_1r1w)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[0].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[1].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[2].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[3].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[4].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[5].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[6].data_mem)
+## bsg_mem_1rw_sync_mask_write_byte: instantiating data_width_p=        64, els_p=       512 (testbench.testbench.wrapper.unicore.dut.c[0].dut.unicore_lite.core_minimal.be.calculator.pipe_mem.dcache.d[7].data_mem)
+__________ ___________  _______________________________
+\______   \\_   _____/ /   _____/\_   _____/\__    ___/
+ |       _/ |    __)_  \_____  \  |    __)_   |    |   
+ |    |   \ |        \ /        \ |        \  |    |  0->1 time =          0
+ |____|_  //_______  //_______  //_______  /  |____|   
+ ASYNC  \/         \/         \/         \/            
+__________ ___________  _______________________________
+\______   \\_   _____/ /   _____/\_   _____/\__    ___/
+ |       _/ |    __)_  \_____  \  |    __)_   |    |   
+ |    |   \ |        \ /        \ |        \  |    |  0->1 time =          0
+ |____|_  //_______  //_______  //_______  /  |____|   
+ ASYNC  \/         \/         \/         \/            
+__________ ___________  _______________________________
+\______   \\_   _____/ /   _____/\_   _____/\__    ___/
+ |       _/ |    __)_  \_____  \  |    __)_   |    |   
+ |    |   \ |        \ /        \ |        \  |    |  0->1 time =          0
+ |____|_  //_______  //_______  //_______  /  |____|   
+ ASYNC  \/         \/         \/         \/            
+Opening dump file
+__________ ___________  _______________________________
+\______   \\_   _____/ /   _____/\_   _____/\__    ___/
+ |       _/ |    __)_  \_____  \  |    __)_   |    |   
+ |    |   \ |        \ /        \ |        \  |    |  1->0 time =       2000
+ |____|_  //_______  //_______  //_______  /  |____|   
+ ASYNC  \/         \/         \/         \/            
+__________ ___________  _______________________________
+\______   \\_   _____/ /   _____/\_   _____/\__    ___/
+ |       _/ |    __)_  \_____  \  |    __)_   |    |   
+ |    |   \ |        \ /        \ |        \  |    |  1->0 time =      12500
+ |____|_  //_______  //_______  //_______  /  |____|   
+ ASYNC  \/         \/         \/         \/            
+__________ ___________  _______________________________
+\______   \\_   _____/ /   _____/\_   _____/\__    ___/
+ |       _/ |    __)_  \_____  \  |    __)_   |    |   
+ |    |   \ |        \ /        \ |        \  |    |  1->0 time =      20000
+ |____|_  //_______  //_______  //_______  /  |____|   
+ ASYNC  \/         \/         \/         \/            
+NBF loader done!
+COSIM_FAIL: commit fifo overrun, core 0
+- /home/nsantos/Desktop/black-parrot-sim/rtl/bp_top/test/common/bp_nonsynth_cosim.sv:300: Verilog $finish
+Finishing test
+Executing final
+[CORE0 STATS]
+	clk   :                    0
+	instr :                    0
+	mIPC  :                    0
+Closing dump file
+Exiting

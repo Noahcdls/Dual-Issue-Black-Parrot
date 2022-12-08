@@ -169,7 +169,7 @@ module bp_be_csr
 
   assign irq_waiting_o = |interrupt_icode_dec_li;
 
-  rv64_exception_dec_s exception_dec_li;
+  rv64_exception_dec_s exception_dec_li, exception_dec_li2;
   assign exception_dec_li =
       '{instr_misaligned    : retire_pkt_cast_i.exception.instr_misaligned
         ,instr_access_fault : retire_pkt_cast_i.exception.instr_access_fault
@@ -252,7 +252,7 @@ module bp_be_csr
 
   bsg_priority_encode
    #(.width_p($bits(exception_dec_li)), .lo_to_hi_p(1))
-   s_interrupt_enc
+   s_interrupt_enc1
     (.i(interrupt_icode_dec_li & mideleg_lo[0+:$bits(exception_dec_li)])
      ,.addr_o(s_interrupt_icode_li)
      ,.v_o(s_interrupt_icode_v_li)
@@ -260,7 +260,7 @@ module bp_be_csr
 //duplicated s interrupt
   bsg_priority_encode
    #(.width_p($bits(exception_dec_li2)), .lo_to_hi_p(1))
-   s_interrupt_enc
+   s_interrupt_enc2
     (.i(interrupt_icode_dec_li & mideleg_lo[0+:$bits(exception_dec_li2)])
      ,.addr_o(s_interrupt_icode_li2)
      ,.v_o(s_interrupt_icode_v_li2)

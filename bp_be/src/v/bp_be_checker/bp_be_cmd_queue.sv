@@ -1,4 +1,9 @@
+/*
+  cmd queue for fe_cmd packets to update for be exceptions and branches
+  updated to take in two fe_cmd packets from the commit system and dispensing only 1
+  since outputting two makes the front end overly complex - Noah
 
+*/
 `include "bp_common_defines.svh"
 `include "bp_be_defines.svh"
 
@@ -29,12 +34,12 @@ module bp_be_cmd_queue
 
   `declare_bp_core_if(vaddr_width_p, paddr_width_p, asid_width_p, branch_metadata_fwd_width_p);
 
-  wire [1:0] enq = {1'b0, (fe_cmd_ready_o & fe_cmd_v_i)} + {1'b0, (fe_cmd_ready_o2 & fe_cmd_v_i2)} ;
+  wire [1:0] enq = {1'b0, (fe_cmd_ready_o & fe_cmd_v_i)} + {1'b0, (fe_cmd_ready_o2 & fe_cmd_v_i2)};
   wire enq1 = (fe_cmd_ready_o & fe_cmd_v_i);
-  wire enq2 = (fe_cmd_ready_o2 & fe_cmd_v_i2)
+  wire enq2 = (fe_cmd_ready_o2 & fe_cmd_v_i2);
   wire deq = fe_cmd_yumi_i;
 
-  logic [ptr_width_lp-1:0] wptr_r, rptr_n, rptr_r;
+  logic [ptr_width_lp-1:0] wptr_r, rptr_n, rptr_r, wptr_r2;
   logic full_lo, empty_lo;
   //have to replace the fifo tracker as it only can do one element writes
   // bsg_fifo_tracker
@@ -55,23 +60,23 @@ module bp_be_cmd_queue
   bsg_circular_ptr
     #(.slots_p(fe_cmd_fifo_els_p),.max_add_p(2))
     rptr_tracker
-    (.clk_i(clk_i)
+    (.clk(clk_i)
     ,.reset_i(reset_i)
-    ,.addi_(deq)
+    ,.add_i(deq)
     ,.o(rptr_r)
     ,.n_o(rptr_n)
     );
   bsg_circular_ptr
     #(.slots_p(fe_cmd_fifo_els_p),.max_add_p(2))
     wptr_tracker
-    (.clk_i(clk_i)
+    (.clk(clk_i)
     ,.reset_i(reset_i)
-    ,.addi_(enq)
+    ,.add_i(enq)
     ,.o(wptr_r)
     ,.n_o()
     );
-  wire [1:0] enq_r, enq_i;
-  wire deq_r, deq_i;
+  logic [1:0] enq_r, enq_i;
+  logic deq_r, deq_i;
   always_ff @(posedge clk_i)
     if (reset_i)
       begin
@@ -82,16 +87,16 @@ module bp_be_cmd_queue
       begin
         // update "last operation" when
         // either enque or dequing
-        if (enq_i || deq_i)
+        if (enq1 || enq2 || deq)
           begin
-             enq_r <= enq_i;
-             deq_r <= deq_i;
+             enq_r <= (enq1 & enq2) ? 2'b10 : (enq1 ^ enq2) ? 2'b01 : 2'b00;
+             deq_r <= deq;
           end
       end // else: !if(reset_i)
   wire equal_ptrs = (rptr_r == wptr_r);
-  assign empty_lo = equal_ptrs & deq_r;
-  assign full_lo = equal_ptrs & enq_r;
-
+  assign empty_lo = equal_ptrs && deq_r;
+  assign full_lo = equal_ptrs && enq_r;
+  assign wptr_r2 = wptr_r + 1;
   // bsg_mem_1r1w
   //  #(.width_p($bits(bp_fe_cmd_s)), .els_p(fe_cmd_fifo_els_p))
   //  fifo_mem
@@ -110,7 +115,7 @@ module bp_be_cmd_queue
     (.w_clk_i(clk_i)
      ,.w_reset_i(reset_i)
      ,.w_v_i({enq1, enq2})
-     ,.w_addr_i({wptr_r, wptr_r+1})
+     ,.w_addr_i({wptr_r, wptr_r2})
      ,.w_data_i({fe_cmd_i, fe_cmd_i2})
      ,.r_v_i(fe_cmd_v_o)
      ,.r_addr_i(rptr_r)
@@ -121,13 +126,13 @@ module bp_be_cmd_queue
   assign fe_cmd_ready_o2 = ~almost_full;
   assign fe_cmd_v_o     = ~empty_lo;
   
-  wire almost_full = (rptr_r == wptr_r+1'b1) | (rptr_r == wptr_r+2);
+  wire almost_full = (rptr_r == wptr_r+1'b1) || (rptr_r == wptr_r+2);
   wire almost_empty = (rptr_r == wptr_r-1'b1);
 
   assign empty_r_o = empty_lo;
-  assign empty_n_o = almost_empty & deq & (enq == 0);
+  assign empty_n_o = almost_empty & deq && (enq == 0);
   assign full_r_o  = full_lo;
-  assign full_n_o  = almost_full & (enq != 0) & ~deq;
+  assign full_n_o  = almost_full && (enq != 0) && ~deq;
 
 endmodule
 
